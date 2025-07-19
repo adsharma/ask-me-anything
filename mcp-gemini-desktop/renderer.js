@@ -10,6 +10,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const serverList = document.getElementById("server-list");
   const settingsBtn = document.getElementById("settings-btn");
 
+  // Settings panel elements
+  const settingsPanel = document.getElementById("settings-panel");
+  const settingsOverlay = document.getElementById("settings-overlay");
+  const closeSettingsBtn = document.getElementById("close-settings-btn");
+  const settingsApiKey = document.getElementById("settings-api-key");
+  const settingsModelSelect = document.getElementById("settings-model-select");
+  const settingsSaveBtn = document.getElementById("settings-save-btn");
+  const settingsCancelBtn = document.getElementById("settings-cancel-btn");
+
   let pythonPort = null;
   let serverRefreshInterval = null;
 
@@ -376,9 +385,9 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
           data.message || `Failed to remove server (status: ${response.status})`
         );
       }
-    
+
       // Incorrectly nested helper functions removed from here.
-    
+
     } catch (error) {
       console.error("Error removing server:", error);
       addMessage(`Error removing server: ${error.message}`, "system");
@@ -632,15 +641,93 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
     }
   });
 
-  settingsBtn.addEventListener("click", () => {
-    window.electronAPI.openSettingsDialog();
-  });
+  // Settings panel functions
+  function openSettings() {
+    settingsPanel.classList.add("open");
+    settingsOverlay.classList.add("active");
+    loadCurrentSettings();
+  }
 
-  window.electronAPI.onApiKeyUpdate((result) => {
-    if (result.success) {
-      addMessage("API Key set successfully. Backend re-initialized.", "system");
-    } else {
-      addMessage(`Error setting API Key: ${result.message}`, "system");
+  function closeSettings() {
+    settingsPanel.classList.remove("open");
+    settingsOverlay.classList.remove("active");
+  }
+
+  async function loadCurrentSettings() {
+    try {
+      // Load current API key (if available)
+      const currentSettings = await window.electronAPI.getCurrentSettings();
+      if (currentSettings.apiKey) {
+        settingsApiKey.value = currentSettings.apiKey;
+      }
+
+      // Load available models
+      await loadAvailableModels();
+
+      if (currentSettings.model) {
+        settingsModelSelect.value = currentSettings.model;
+      }
+    } catch (error) {
+      console.error("Error loading current settings:", error);
+    }
+  }
+
+  async function loadAvailableModels() {
+    try {
+      settingsModelSelect.innerHTML = '<option value="">Loading models...</option>';
+      const models = await window.electronAPI.getAvailableModels();
+
+      settingsModelSelect.innerHTML = '';
+      if (models && models.length > 0) {
+        models.forEach(model => {
+          const option = document.createElement('option');
+          option.value = model;
+          option.textContent = model;
+          settingsModelSelect.appendChild(option);
+        });
+      } else {
+        settingsModelSelect.innerHTML = '<option value="">No models available</option>';
+      }
+    } catch (error) {
+      console.error("Error loading models:", error);
+      settingsModelSelect.innerHTML = '<option value="">Error loading models</option>';
+    }
+  }
+
+  async function saveSettings() {
+    const apiKey = settingsApiKey.value.trim();
+    const selectedModel = settingsModelSelect.value;
+
+    if (!apiKey) {
+      addMessage("Please enter an API key.", "system");
+      return;
+    }
+
+    try {
+      const result = await window.electronAPI.saveApiKey(apiKey, selectedModel);
+      if (result.success) {
+        addMessage("Settings saved successfully. Backend re-initialized.", "system");
+        closeSettings();
+      } else {
+        addMessage(`Error saving settings: ${result.message}`, "system");
+      }
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      addMessage(`Error saving settings: ${error.message}`, "system");
+    }
+  }
+
+  // Settings panel event listeners
+  settingsBtn.addEventListener("click", openSettings);
+  closeSettingsBtn.addEventListener("click", closeSettings);
+  settingsOverlay.addEventListener("click", closeSettings);
+  settingsCancelBtn.addEventListener("click", closeSettings);
+  settingsSaveBtn.addEventListener("click", saveSettings);
+
+  // Handle Escape key to close settings
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && settingsPanel.classList.contains("open")) {
+      closeSettings();
     }
   });
 

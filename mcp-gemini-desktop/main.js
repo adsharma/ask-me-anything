@@ -244,28 +244,84 @@ ipcMain.handle("set-model", async (event, modelName) => {
 
 // --- End Model Switching IPC Handlers ---
 
-ipcMain.on("save-api-key", async (event, apiKey) => {
-  console.log("[save-api-key] Received API key from settings dialog.");
-  let result;
+// Integrated settings handlers
+ipcMain.handle("get-current-settings", async () => {
   try {
-    const response = await fetch(`http://127.0.0.1:${pythonPort}/set-api-key`, {
+    if (!pythonPort) {
+      return { apiKey: "", model: "" };
+    }
+
+    // For now, we don't store the API key locally for security reasons
+    // But we can get the current model
+    const modelResponse = await fetch(`http://127.0.0.1:${pythonPort}/get-model`);
+    const modelData = await modelResponse.json();
+
+    return {
+      apiKey: "", // Don't return actual API key for security
+      model: modelData.model || ""
+    };
+  } catch (error) {
+    console.error("Error getting current settings:", error);
+    return { apiKey: "", model: "" };
+  }
+});
+
+ipcMain.handle("get-available-models", async () => {
+  try {
+    if (!pythonPort) {
+      return [];
+    }
+
+    const response = await fetch(`http://127.0.0.1:${pythonPort}/list-models`);
+    const data = await response.json();
+    return data.models || [];
+  } catch (error) {
+    console.error("Error getting available models:", error);
+    return [];
+  }
+});
+
+ipcMain.handle("save-api-key", async (event, apiKey, model) => {
+  console.log("[save-api-key] Received API key and model from integrated settings.");
+  try {
+    if (!pythonPort) {
+      throw new Error("Backend not available");
+    }
+
+    // Set API key
+    const apiResponse = await fetch(`http://127.0.0.1:${pythonPort}/set-api-key`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({apiKey: apiKey}),
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || `HTTP error! status: ${response.status}`);
+
+    const apiData = await apiResponse.json();
+    if (!apiResponse.ok) {
+      throw new Error(apiData.message || `HTTP error! status: ${apiResponse.status}`);
     }
-    console.log("[save-api-key] Backend responded:", data);
-    result = {success: true, message: data.message};
+
+    // Set model if provided
+    if (model) {
+      const modelResponse = await fetch(`http://127.0.0.1:${pythonPort}/set-model`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({model: model}),
+      });
+
+      const modelData = await modelResponse.json();
+      if (!modelResponse.ok) {
+        throw new Error(modelData.message || `HTTP error! status: ${modelResponse.status}`);
+      }
+    }
+
+    console.log("[save-api-key] Settings saved successfully");
+    return {success: true, message: "Settings saved successfully"};
   } catch (error) {
-    console.error("[save-api-key] Error setting API key via backend:", error);
-    result = {success: false, message: error.message};
-  }
-  if (mainWindow) {
-    mainWindow.webContents.send("api-key-update-status", result);
+    console.error("[save-api-key] Error saving settings:", error);
+    return {success: false, message: error.message};
   }
 });

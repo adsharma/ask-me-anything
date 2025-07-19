@@ -11,112 +11,180 @@
     <title>Settings</title>
     <style>
       :root {
-        --chat-bg: #fdfcf7;
+        --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         --sidebar-bg: #f4f1e7;
+        --chat-bg: #fdfcf7;
+        --input-bg: #f4f1e7;
         --border-color: #dcd3c4;
         --text-primary: #4a3f32;
+        --text-secondary: #8c7d6b;
         --accent-color: #6b5a48;
         --accent-hover: #5d4e3c;
         --user-message-text: #fdfcf7;
+        --title-bar-height: 38px;
       }
+
       body {
-        font-family: var(--font-family);
-        padding: 20px 25px;
-        background-color: var(--sidebar-bg); /* Match sidebar */
-        color: var(--text-primary);
         margin: 0;
+        font-family: var(--font-family);
+        background-color: var(--chat-bg);
+        color: var(--text-primary);
+        height: 100vh;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
+      }
+
+      .title-bar {
+        height: var(--title-bar-height);
+        -webkit-app-region: drag;
+        background-color: var(--sidebar-bg);
+        border-bottom: 1px solid var(--border-color);
+        flex-shrink: 0;
+      }
+
+      .settings-container {
+        flex-grow: 1;
+        padding: 25px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        max-width: 500px;
+        margin: 0 auto;
+        width: 100%;
         box-sizing: border-box;
-        height: 100vh;
       }
-      .form-group {
-        margin-bottom: 16px; /* Consistent spacing */
+
+      .settings-header {
+        text-align: center;
+        margin-bottom: 20px;
       }
-      label {
-        display: block;
-        margin-bottom: 6px;
-        font-weight: 500;
-        font-size: 0.9em;
+
+      .settings-header h1 {
+        margin: 0 0 5px 0;
+        font-size: 1.4em;
+        font-weight: 600;
         color: var(--text-primary);
       }
+
+      .settings-header .subtitle {
+        margin: 0;
+        font-size: 0.95em;
+        color: var(--text-secondary);
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        font-size: 0.95em;
+        color: var(--text-primary);
+      }
+
       input[type="password"],
       select {
         width: 100%;
-        padding: 10px 14px; /* Increased padding */
+        padding: 12px 15px;
         border: 1px solid var(--border-color);
-        border-radius: 8px; /* Consistent radius */
+        border-radius: 6px;
         box-sizing: border-box;
         font-size: 0.95em;
-        background-color: var(--chat-bg); /* Match chat input bg */
+        background-color: var(--chat-bg);
         color: var(--text-primary);
+        font-family: var(--font-family);
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
       }
+
       input[type="password"]:focus,
       select:focus {
         outline: none;
         border-color: var(--accent-color);
-        box-shadow: 0 0 0 3px rgba(107, 90, 72, 0.2); /* Match chat input focus */
+        box-shadow: 0 0 0 3px rgba(107, 90, 72, 0.1);
       }
+
+      select {
+        appearance: none;
+        background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238c7d6b%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+        background-repeat: no-repeat;
+        background-position: right 15px center;
+        background-size: 0.7em auto;
+        cursor: pointer;
+      }
+
       .buttons {
         display: flex;
         justify-content: flex-end;
-        gap: 10px; /* Slightly reduced gap */
-        margin-top: 10px; /* Space above buttons */
+        gap: 12px;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color);
       }
+
       button {
-        padding: 9px 16px; /* Adjusted padding */
-        border-radius: 6px; /* Consistent radius */
-        border: 1px solid transparent;
+        padding: 10px 16px;
+        border-radius: 6px;
         cursor: pointer;
-        font-size: 0.95em; /* Match input font size */
+        font-size: 0.95em;
         font-weight: 500;
-        transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        font-family: var(--font-family);
+        transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        border: 1px solid transparent;
       }
+
       #save-btn {
-        background-color: var(--accent-color); /* Match Add Server button */
+        background-color: var(--accent-color);
         color: var(--user-message-text);
         border-color: var(--accent-color);
       }
+
       #save-btn:hover {
         background-color: var(--accent-hover);
         border-color: var(--accent-hover);
       }
+
       #cancel-btn {
-        background-color: transparent; /* Match Settings button */
-        color: var(--text-secondary); /* Match Settings button */
-        border: 1px solid var(--border-color); /* Match Settings button */
+        background: none;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
       }
+
       #cancel-btn:hover {
-        background-color: #edeae0; /* Match Settings button hover */
+        background-color: #edeae0;
         border-color: #c8bfaf;
         color: var(--text-primary);
-      }
-      select {
-        appearance: none;
-        background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236B5A48%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
-        background-repeat: no-repeat;
-        background-position: right 14px center;
-        background-size: 0.7em auto;
-        cursor: pointer;
       }
     </style>
   </head>
   <body>
-    <div class="form-group">
-      <label for="api-key">Gemini API Key:</label>
-      <input type="password" id="api-key" />
-    </div>
+    <div class="title-bar"></div>
+    <div class="settings-container">
+      <div class="settings-header">
+        <h1>Settings</h1>
+        <p class="subtitle">Configure your Gemini API settings</p>
+      </div>
 
-    <div class="form-group">
-      <label for="model-select">Gemini Model:</label>
-    <select id="model-select">
-      <!-- Options will be populated by settings.js -->
-      <option value="">Loading models...</option>
-    </select>
-    <div class="buttons">
-      <button id="cancel-btn">Cancel</button>
-      <button id="save-btn">Save</button>
+      <div class="form-group">
+        <label for="api-key">Gemini API Key:</label>
+        <input type="password" id="api-key" />
+      </div>
+
+      <div class="form-group">
+        <label for="model-select">Gemini Model:</label>
+        <select id="model-select">
+          <!-- Options will be populated by settings.js -->
+          <option value="">Loading models...</option>
+        </select>
+      </div>
+
+      <div class="buttons">
+        <button id="cancel-btn">Cancel</button>
+        <button id="save-btn">Save</button>
+      </div>
     </div>
     <script src="settings.js"></script>
   </body>
