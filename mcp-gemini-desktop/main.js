@@ -81,11 +81,6 @@ function createWindow() {
       );
     });
 
-  // Only open DevTools if not packaged
-  if (!app.isPackaged) {
-    mainWindow.webContents.openDevTools();
-  }
-
   mainWindow.on("closed", () => {
     console.log("[createWindow] Main window closed.");
     mainWindow = null;
