@@ -1,10 +1,10 @@
 <div align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/assets/app_icon.png" width="128" height="128" alt="GemCP Chat Logo">
+  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-ai-desktop/assets/app_icon.png" width="128" height="128" alt="MCP AI Chat Logo">
 
-  <h1>GemCP Chat</h1>
+  <h1>MCP AI Chat</h1>
 
   <p>
-    The GemCP app is a cross-platform desktop application that creates a seamless chat interface for Google's Gemini AI models with extensible capabilities through a Model Context Protocol (MCP) framework.
+    The MCP AI app is a cross-platform desktop application that creates a seamless chat interface for Google's Gemini AI models with extensible capabilities through a Model Context Protocol (MCP) framework.
   </p>
 </div>
 
@@ -22,17 +22,17 @@
 ## Screenshots
 
 <p align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/demo_images/C9zdjSLfhAfEswt.png" width="80%" alt="Weather Tool Example">
+  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-ai-desktop/demo_images/C9zdjSLfhAfEswt.png" width="80%" alt="Weather Tool Example">
   <br><em>Example of the weather tool in action</em>
 </p>
 
 <p align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/demo_images/BEvT6bS7bFJVVKK.png" width="80%" alt="Chat Interface">
+  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-ai-desktop/demo_images/BEvT6bS7bFJVVKK.png" width="80%" alt="Chat Interface">
   <br><em>Main chat interface with Gemini</em>
 </p>
 
 <p align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/demo_images/KdLPsRCxjbJB9ph.png" width="80%" alt="Calculator Tool Example">
+  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-ai-desktop/demo_images/KdLPsRCxjbJB9ph.png" width="80%" alt="Calculator Tool Example">
   <br><em>Using the calculator tool with Gemini</em>
 </p>
 
@@ -42,7 +42,7 @@ This repository contains both a Python backend and an Electron-based desktop app
 
 ## Project Structure
 
-- **mcp-gemini-desktop/**: Frontend Electron application
+- **mcp-ai-desktop/**: Frontend Electron application
 - **python_backend/**: Python backend server
 
 ## Running the Python Backend
@@ -102,7 +102,7 @@ This repository contains both a Python backend and an Electron-based desktop app
 1. Navigate to the Electron app directory:
 
    ```bash
-   cd mcp-gemini-desktop
+   cd mcp-ai-desktop
    ```
 
 2. Install the required dependencies:
@@ -121,7 +121,7 @@ This repository contains both a Python backend and an Electron-based desktop app
 To build the Electron app for your platform:
 
 ```bash
-cd mcp-gemini-desktop
+cd mcp-ai-desktop
 npm run build
 ```
 
@@ -131,18 +131,18 @@ This will create platform-specific binaries in the `dist` folder.
 
 If you prefer to use pre-built binaries directly:
 
-1. Navigate to the `mcp-gemini-desktop/dist` directory
+1. Navigate to the `mcp-ai-desktop/dist` directory
 2. For macOS: Install the `.dmg` file
 3. For Windows: Run the `.exe` installer
 
 ### Available Binaries
 
-- macOS (Apple Silicon): `GemCP Chat-0.1.0-arm64.dmg`
+- macOS (Apple Silicon): `MCP AI Chat-0.1.0-arm64.dmg`
 - Windows: Check the `dist` folder for `.exe` files
 
 ## Example Servers
 
-The repository includes example server implementations in `mcp-gemini-desktop/mcp_example_servers/`:
+The repository includes example server implementations in `mcp-ai-desktop/mcp_example_servers/`:
 
 - `mcp_server_calc.py`: Calculator server example
 - `mcp_server_weather.py`: Weather information server example

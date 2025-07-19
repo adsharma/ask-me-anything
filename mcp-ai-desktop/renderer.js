@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const settingsPanel = document.getElementById("settings-panel");
   const settingsOverlay = document.getElementById("settings-overlay");
   const closeSettingsBtn = document.getElementById("close-settings-btn");
+  const settingsBackendSelect = document.getElementById("settings-backend-select");
   const settingsApiKey = document.getElementById("settings-api-key");
   const settingsModelSelect = document.getElementById("settings-model-select");
   const settingsSaveBtn = document.getElementById("settings-save-btn");
@@ -655,8 +656,16 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
 
   async function loadCurrentSettings() {
     try {
-      // Load current API key (if available)
+      // Load current settings including backend
       const currentSettings = await window.electronAPI.getCurrentSettings();
+
+      // Set backend
+      if (currentSettings.backend && settingsBackendSelect) {
+        settingsBackendSelect.value = currentSettings.backend;
+        updateUIForBackend(currentSettings.backend);
+      }
+
+      // Set API key if available
       if (currentSettings.apiKey) {
         settingsApiKey.value = currentSettings.apiKey;
       }
@@ -664,11 +673,45 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
       // Load available models
       await loadAvailableModels();
 
+      // Set current model
       if (currentSettings.model) {
         settingsModelSelect.value = currentSettings.model;
       }
     } catch (error) {
       console.error("Error loading current settings:", error);
+    }
+  }
+
+  // Function to update UI based on selected backend
+  function updateUIForBackend(backend) {
+    const apiKeyLabel = settingsApiKey.parentElement.querySelector('label');
+
+    switch(backend) {
+      case 'gemini':
+        apiKeyLabel.textContent = 'Gemini API Key:';
+        settingsApiKey.placeholder = 'Enter your Gemini API key';
+        settingsApiKey.required = true;
+        break;
+      case 'ollama':
+        apiKeyLabel.textContent = 'API Key (Optional):';
+        settingsApiKey.placeholder = 'API key not required for local models';
+        settingsApiKey.required = false;
+        break;
+      case 'openai':
+        apiKeyLabel.textContent = 'OpenAI API Key:';
+        settingsApiKey.placeholder = 'Enter your OpenAI API key (for MLX via OpenAI-compatible API)';
+        settingsApiKey.required = true;
+        break;
+      case 'anthropic':
+        apiKeyLabel.textContent = 'Anthropic API Key:';
+        settingsApiKey.placeholder = 'Enter your Anthropic API key';
+        settingsApiKey.required = true;
+        break;
+      case 'cohere':
+        apiKeyLabel.textContent = 'Cohere API Key:';
+        settingsApiKey.placeholder = 'Enter your Cohere API key';
+        settingsApiKey.required = true;
+        break;
     }
   }
 
@@ -679,11 +722,29 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
 
       settingsModelSelect.innerHTML = '';
       if (models && models.length > 0) {
+        // Group models by provider for better organization
+        const modelsByProvider = {};
         models.forEach(model => {
-          const option = document.createElement('option');
-          option.value = model;
-          option.textContent = model;
-          settingsModelSelect.appendChild(option);
+          const provider = model.split('/')[0];
+          if (!modelsByProvider[provider]) {
+            modelsByProvider[provider] = [];
+          }
+          modelsByProvider[provider].push(model);
+        });
+
+        // Add models grouped by provider
+        Object.keys(modelsByProvider).sort().forEach(provider => {
+          const optgroup = document.createElement('optgroup');
+          optgroup.label = provider.charAt(0).toUpperCase() + provider.slice(1);
+
+          modelsByProvider[provider].forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            optgroup.appendChild(option);
+          });
+
+          settingsModelSelect.appendChild(optgroup);
         });
       } else {
         settingsModelSelect.innerHTML = '<option value="">No models available</option>';
@@ -697,14 +758,16 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
   async function saveSettings() {
     const apiKey = settingsApiKey.value.trim();
     const selectedModel = settingsModelSelect.value;
+    const selectedBackend = settingsBackendSelect.value;
 
-    if (!apiKey) {
-      addMessage("Please enter an API key.", "system");
+    // Validate required fields based on backend
+    if (['gemini', 'openai', 'anthropic', 'cohere'].includes(selectedBackend) && !apiKey) {
+      addMessage("API key is required for this provider.", "system");
       return;
     }
 
     try {
-      const result = await window.electronAPI.saveApiKey(apiKey, selectedModel);
+      const result = await window.electronAPI.saveApiKey(apiKey, selectedModel, selectedBackend);
       if (result.success) {
         addMessage("Settings saved successfully. Backend re-initialized.", "system");
         closeSettings();
@@ -723,6 +786,18 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
   settingsOverlay.addEventListener("click", closeSettings);
   settingsCancelBtn.addEventListener("click", closeSettings);
   settingsSaveBtn.addEventListener("click", saveSettings);
+
+  // Handle backend selection change
+  if (settingsBackendSelect) {
+    settingsBackendSelect.addEventListener('change', async () => {
+      const selectedBackend = settingsBackendSelect.value;
+      updateUIForBackend(selectedBackend);
+
+      // Reload models for new backend
+      settingsModelSelect.innerHTML = '<option value="">Loading models...</option>';
+      await loadAvailableModels();
+    });
+  }
 
   // Handle Escape key to close settings
   document.addEventListener("keydown", (e) => {

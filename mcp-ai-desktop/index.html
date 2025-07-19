@@ -8,7 +8,7 @@
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' http://127.0.0.1:5001;" />
-    <title>GemCP Chat</title>
+    <title>MCP AI Chat</title>
     <link
       rel="stylesheet"
       href="style.css" />
@@ -60,9 +60,9 @@
       </div>
       <div class="chat-area">
         <div class="chat-header">
-          <h1>GemCP Chat</h1>
+          <h1>MCP Chat</h1>
           <p class="subtitle">
-            Supercharge your Gemini with your own MCP servers
+            AI-powered chat with MCP server integration
           </p>
           <!-- Removed outdated support note -->
         </div>
@@ -99,12 +99,23 @@
 
         <div class="settings-content">
           <div class="form-group">
-            <label for="settings-api-key">Gemini API Key:</label>
-            <input type="password" id="settings-api-key" placeholder="Enter your Gemini API key" />
+            <label for="settings-backend-select">AI Provider:</label>
+            <select id="settings-backend-select">
+              <option value="gemini">Google Gemini</option>
+              <option value="ollama">Ollama (Local)</option>
+              <option value="openai">OpenAI/MLX</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="cohere">Cohere</option>
+            </select>
           </div>
 
           <div class="form-group">
-            <label for="settings-model-select">Gemini Model:</label>
+            <label for="settings-api-key">API Key:</label>
+            <input type="password" id="settings-api-key" placeholder="Enter your API key" />
+          </div>
+
+          <div class="form-group">
+            <label for="settings-model-select">Model:</label>
             <select id="settings-model-select">
               <option value="">Loading models...</option>
             </select>

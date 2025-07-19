@@ -116,6 +116,13 @@
         cursor: pointer;
       }
 
+      .help-text {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+        display: block;
+      }
+
       .buttons {
         display: flex;
         justify-content: flex-end;
@@ -165,16 +172,28 @@
     <div class="settings-container">
       <div class="settings-header">
         <h1>Settings</h1>
-        <p class="subtitle">Configure your Gemini API settings</p>
+        <p class="subtitle">Configure your AI backend settings</p>
       </div>
 
       <div class="form-group">
-        <label for="api-key">Gemini API Key:</label>
+        <label for="backend-select">AI Provider:</label>
+        <select id="backend-select">
+          <option value="gemini">Google Gemini</option>
+          <option value="ollama">Ollama (Local)</option>
+          <option value="openai">OpenAI/MLX (OpenAI-compatible)</option>
+          <option value="anthropic">Anthropic Claude</option>
+          <option value="cohere">Cohere</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="api-key">API Key:</label>
         <input type="password" id="api-key" />
+        <small class="help-text">Enter your API key (not required for Ollama local models)</small>
       </div>
 
       <div class="form-group">
-        <label for="model-select">Gemini Model:</label>
+        <label for="model-select">Model:</label>
         <select id="model-select">
           <!-- Options will be populated by settings.js -->
           <option value="">Loading models...</option>

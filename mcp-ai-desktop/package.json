@@ -1,7 +1,7 @@
 {
-  "name": "mcp-gemini-desktop",
+  "name": "mcp-ai-desktop",
   "version": "0.1.0",
-  "description": "Desktop chat app for Gemini with MCP integration",
+  "description": "Desktop chat app for AI backends (Gemini, Ollama, MLX) with MCP integration",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,7 +10,10 @@
   },
   "keywords": [
     "Electron",
+    "AI",
     "Gemini",
+    "Ollama",
+    "MLX",
     "MCP",
     "Chat"
   ],
@@ -22,8 +25,8 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.yourcompany.gemcpchat",
-    "productName": "GemCP Chat",
+    "appId": "com.yourcompany.mcpaichat",
+    "productName": "MCP AI Chat",
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",

@@ -8,6 +8,37 @@ let mainWindow;
 let settingsWindow = null;
 const pythonPort = 5001;
 
+// Backend configuration using LiteLLM providers
+const BACKEND_TYPES = {
+  GEMINI: 'gemini',
+  OLLAMA: 'ollama',
+  OPENAI: 'openai', // For MLX via OpenAI-compatible API
+  ANTHROPIC: 'anthropic',
+  COHERE: 'cohere'
+};
+
+// Model name helpers for LiteLLM format
+const MODEL_HELPERS = {
+  parseModelName: (fullModelName) => {
+    const parts = fullModelName.split('/');
+    if (parts.length >= 2) {
+      return {
+        provider: parts[0],
+        model: parts.slice(1).join('/')
+      };
+    }
+    return { provider: 'unknown', model: fullModelName };
+  },
+  formatModelName: (provider, model) => {
+    return `${provider}/${model}`;
+  },
+  getProviderFromModel: (fullModelName) => {
+    return fullModelName.split('/')[0];
+  }
+};
+
+let currentBackend = BACKEND_TYPES.GEMINI; // Default to Gemini for backward compatibility
+
 function createSettingsWindow() {
   if (settingsWindow) {
     settingsWindow.focus();
@@ -56,7 +87,7 @@ function createWindow() {
     trafficLightPosition: {x: 15, y: 15},
     minWidth: 800,
     minHeight: 600,
-    title: "GemCP Chat",
+    title: "MCP AI Chat",
     backgroundColor: "#fdfcf7",
     icon: path.join(
       __dirname,
@@ -132,6 +163,29 @@ app.on("quit", () => {
 
 ipcMain.handle("get-python-port", async () => {
   return pythonPort;
+});
+
+ipcMain.handle("get-backend-types", async () => {
+  return BACKEND_TYPES;
+});
+
+ipcMain.handle("get-model-helpers", async () => {
+  return MODEL_HELPERS;
+});
+
+ipcMain.handle("get-current-backend", async () => {
+  return currentBackend;
+});
+
+ipcMain.handle("set-backend", async (event, backendType) => {
+  console.log(`[set-backend] Setting backend to: ${backendType}`);
+  if (Object.values(BACKEND_TYPES).includes(backendType)) {
+    currentBackend = backendType;
+    console.log(`[set-backend] Backend set to: ${currentBackend}`);
+    return { success: true, backend: currentBackend };
+  } else {
+    throw new Error(`Invalid backend type: ${backendType}`);
+  }
 });
 
 ipcMain.handle("show-open-dialog", async (event, options) => {
@@ -248,7 +302,7 @@ ipcMain.handle("set-model", async (event, modelName) => {
 ipcMain.handle("get-current-settings", async () => {
   try {
     if (!pythonPort) {
-      return { apiKey: "", model: "" };
+      return { apiKey: "", model: "", backend: currentBackend };
     }
 
     // For now, we don't store the API key locally for security reasons
@@ -258,11 +312,12 @@ ipcMain.handle("get-current-settings", async () => {
 
     return {
       apiKey: "", // Don't return actual API key for security
-      model: modelData.model || ""
+      model: modelData.model || "",
+      backend: currentBackend
     };
   } catch (error) {
     console.error("Error getting current settings:", error);
-    return { apiKey: "", model: "" };
+    return { apiKey: "", model: "", backend: currentBackend };
   }
 });
 
@@ -281,11 +336,18 @@ ipcMain.handle("get-available-models", async () => {
   }
 });
 
-ipcMain.handle("save-api-key", async (event, apiKey, model) => {
-  console.log("[save-api-key] Received API key and model from integrated settings.");
+ipcMain.handle("save-api-key", async (event, apiKey, model, backend) => {
+  console.log("[save-api-key] Received settings from integrated settings.");
   try {
     if (!pythonPort) {
       throw new Error("Backend not available");
+    }
+
+    // Set backend if provided
+    if (backend && Object.values(BACKEND_TYPES).includes(backend)) {
+      // For LiteLLM, we don't need to set backend separately as it's part of the model name
+      currentBackend = backend;
+      console.log(`[save-api-key] Backend updated to: ${currentBackend}`);
     }
 
     // Set API key
