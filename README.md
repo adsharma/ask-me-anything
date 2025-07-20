@@ -1,10 +1,11 @@
 <div align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/assets/app_icon.png" width="128" height="128" alt="MCP AI Chat Logo">
 
   <h1>Ask Me Anything</h1>
 
   <p>
     Ask me anything app is a cross-platform desktop application that creates a seamless chat interface for AI models with extensible capabilities through a Model Context Protocol (MCP) framework.
+
+    It is a fork of a previous project that was [Gemini specific](https://github.com/kkrishnan90/gemini-desktop/)
   </p>
 </div>
 
