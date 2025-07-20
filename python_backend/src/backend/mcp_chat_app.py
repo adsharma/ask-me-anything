@@ -2,6 +2,7 @@
 import asyncio
 import sys
 import os
+import json
 from dotenv import load_dotenv
 from contextlib import AsyncExitStack
 from typing import List, Dict, Any, Optional, Tuple, Set
@@ -12,6 +13,7 @@ from google.genai import types as genai_types
 from google.genai import errors as genai_errors
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from ai_backend_manager import AIBackendManager
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -21,83 +23,118 @@ load_dotenv()
 
 
 class MCPChatApp:
-    def __init__(self, gemini_model_name: str = "gemini-1.5-flash-latest"):
-        self.gemini_model_name = gemini_model_name
+    def __init__(self, backend_type: str = "gemini", model_name: str = None):
+        # Initialize the AI backend manager
+        self.ai_backend = AIBackendManager()
+        if backend_type:
+            self.ai_backend.set_backend(backend_type)
+        if model_name:
+            self.ai_backend.set_model(model_name)
+
+        # Legacy Gemini-specific properties (for backward compatibility)
+        self.gemini_model_name = self.ai_backend.get_model()
         self.gemini_sync_client: Optional[genai.Client] = None
         self.gemini_client: Optional[genai.client.AsyncClient] = None
+
+        # MCP-related properties
         self.mcp_tools: List[Any] = []
         self.tool_to_session: Dict[str, ClientSession] = {}
         self.chat_history: List[genai_types.Content] = []
-        # self.connected_server_paths: Set[str] = set() # Replaced by keys of server_resources
-        self.server_resources: Dict[str, Dict[str, Any]] = {} # Key is the identifier (path or name)
+        self.server_resources: Dict[str, Dict[str, Any]] = {}
         self.cached_gemini_declarations: Optional[List[genai_types.FunctionDeclaration]] = None
         self.gemini_tools_dirty: bool = True
         self.status_check_task: Optional[asyncio.Task] = None
         self.api_key: Optional[str] = None
-        # Add available models list
-        self.available_models: List[str] = [
-            "gemini-1.5-flash-latest",
-            "gemini-1.5-pro-latest",
-            # Add other desired models here, ensure they are valid for the API key/region
-            "gemini-2.0-flash",
-            "gemini-2.5-pro-exp-03-25",
-        ]
+
+    # Backend Management Methods
+    def set_backend(self, backend_type: str) -> bool:
+        """Set the AI backend type."""
+        return self.ai_backend.set_backend(backend_type)
+
+    def get_backend(self) -> str:
+        """Get the current AI backend type."""
+        return self.ai_backend.get_backend()
+
+    def set_model(self, model_name: str) -> bool:
+        """Set the model for the current backend."""
+        success = self.ai_backend.set_model(model_name)
+        if success:
+            self.gemini_model_name = model_name  # Keep legacy property in sync
+        return success
+
+    def get_model(self) -> str:
+        """Get the current model name."""
+        return self.ai_backend.get_model()
+
+    async def list_available_models(self) -> List[str]:
+        """List available models for the current backend."""
+        return await self.ai_backend.list_models()
+
+    def requires_api_key(self) -> bool:
+        """Check if current backend requires an API key."""
+        return self.ai_backend.requires_api_key()
+
+    async def set_api_key_and_reinitialize(self, new_key: str):
+        """Set API key for the current backend."""
+        logger.info(f"Received new API key for {self.ai_backend.get_backend()} backend.")
+        self.api_key = new_key
+        self.ai_backend.set_api_key(new_key)
+
+        # For backward compatibility, also initialize Gemini if it's the current backend
+        if self.ai_backend.get_backend() == "gemini":
+            try:
+                await self.initialize_gemini()
+                logger.info("Gemini client re-initialized successfully with new API key.")
+            except Exception as e:
+                logger.error(f"Failed to re-initialize Gemini with new API key: {e}")
+                self.api_key = None
+                raise
+
+    # Legacy Gemini compatibility methods
+    def set_gemini_model(self, model_name: str):
+        """Legacy method for setting Gemini model."""
+        if self.ai_backend.get_backend() != "gemini":
+            logger.warning(f"set_gemini_model called but current backend is {self.ai_backend.get_backend()}")
+            return
+
+        success = self.set_model(model_name)
+        if not success:
+            available_models = asyncio.run(self.list_available_models())
+            raise ValueError(f"Unsupported model name: {model_name}. Available: {', '.join(available_models)}")
+
+    def get_gemini_model(self) -> str:
+        """Legacy method for getting Gemini model."""
+        return self.get_model()
+
+    def get_available_models(self) -> List[str]:
+        """Legacy method for getting available models."""
+        return asyncio.run(self.list_available_models())
 
     async def initialize_gemini(self):
+        """Legacy method for Gemini initialization."""
+        if self.ai_backend.get_backend() != "gemini":
+            logger.warning("initialize_gemini called but current backend is not Gemini")
+            return
+
         api_key_to_use = self.api_key or os.getenv("GEMINI_API_KEY")
         if not api_key_to_use:
-            logger.error(
-                "GEMINI_API_KEY not found in environment variables or instance.")
+            logger.error("GEMINI_API_KEY not found in environment variables or instance.")
             raise ValueError("GEMINI_API_KEY is required.")
+
         try:
+            self.ai_backend.set_api_key(api_key_to_use)
             self.gemini_sync_client = genai.Client(api_key=api_key_to_use)
             self.gemini_client = self.gemini_sync_client.aio
             logger.info("Gemini async client initialized successfully.")
+
             if not self.status_check_task or self.status_check_task.done():
-                self.status_check_task = asyncio.create_task(
-                    self._periodic_status_checker())
+                self.status_check_task = asyncio.create_task(self._periodic_status_checker())
                 logger.info("Started periodic server status checker.")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini client: {e}")
-            self.gemini_client = None  # Ensure client is None on failure
+            self.gemini_client = None
             self.gemini_sync_client = None
             raise
-
-    async def set_api_key_and_reinitialize(self, new_key: str):
-        logger.info("Received new API key, attempting to re-initialize Gemini.")
-        self.api_key = new_key
-        try:
-            await self.initialize_gemini()
-            logger.info(
-                "Gemini client re-initialized successfully with new API key.")
-        except Exception as e:
-            logger.error(
-                f"Failed to re-initialize Gemini with new API key: {e}")
-            self.api_key = None  # Revert if initialization fails
-            raise
-
-    def set_gemini_model(self, model_name: str):
-        """Sets the Gemini model name to be used for future queries."""
-        if model_name not in self.available_models:
-             # Or fetch available models dynamically if preferred/possible
-            logger.warning(f"Attempted to set unsupported Gemini model: {model_name}")
-            raise ValueError(f"Unsupported model name: {model_name}. Available: {', '.join(self.available_models)}")
-        if model_name != self.gemini_model_name:
-            logger.info(f"Switching Gemini model from {self.gemini_model_name} to {model_name}")
-            self.gemini_model_name = model_name
-            # Optionally, clear chat history when model changes?
-            # self.chat_history = []
-            # logger.info("Chat history cleared due to model change.")
-        else:
-            logger.info(f"Gemini model is already set to {model_name}")
-
-    def get_gemini_model(self) -> str:
-        """Returns the currently configured Gemini model name."""
-        return self.gemini_model_name
-
-    def get_available_models(self) -> List[str]:
-        """Returns the list of available Gemini model names."""
-        return self.available_models
 
     async def _check_server_status(self, identifier: str, session: ClientSession):
         # Use identifier (path or name) for logging and access
@@ -396,7 +433,113 @@ class MCPChatApp:
             return error_msg, None
 
     async def process_query(self, query: str) -> str:
-        logger.info(f"Processing query: '{query}'") # Add logging
+        """Process a query using the current AI backend."""
+        logger.info(f"Processing query with {self.ai_backend.get_backend()} backend: '{query}'")
+
+        # Check if backend is configured
+        config_validation = self.ai_backend.validate_configuration()
+        if not config_validation["valid"]:
+            error_msg = f"Backend not properly configured: {', '.join(config_validation['issues'])}"
+            logger.error(error_msg)
+            return f"Error: {error_msg}"
+
+        try:
+            # For Gemini backend, use the existing implementation with MCP tools
+            if self.ai_backend.get_backend() == "gemini":
+                return await self._process_query_gemini(query)
+            else:
+                # For other backends, use LiteLLM
+                return await self._process_query_litellm(query)
+
+        except Exception as e:
+            logger.error(f"Error processing query with {self.ai_backend.get_backend()}: {e}", exc_info=True)
+            return f"An error occurred while processing your request: {e}"
+
+    async def _process_query_litellm(self, query: str) -> str:
+        """Process query using LiteLLM for non-Gemini backends."""
+        try:
+            # Convert MCP tools to OpenAI function format if available
+            tools = None
+            if self.mcp_tools:
+                tools = self._convert_mcp_tools_to_openai_format()
+
+            # Create system prompt for MCP context
+            system_prompt = None
+            if self.mcp_tools:
+                tool_descriptions = [f"- {tool['name']}: {tool.get('description', 'No description')}" for tool in self.mcp_tools]
+                system_prompt = f"You have access to the following tools:\n" + "\n".join(tool_descriptions)
+
+            # Send request to backend
+            response = await self.ai_backend.chat_async(
+                message=query,
+                system_prompt=system_prompt,
+                tools=tools
+            )
+
+            # Handle tool calls if present
+            if tools and response.startswith('[') and 'function' in response:
+                try:
+                    tool_calls = json.loads(response)
+                    return await self._handle_tool_calls_litellm(tool_calls, query)
+                except (json.JSONDecodeError, KeyError):
+                    # Not a tool call, return as regular response
+                    pass
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error in LiteLLM processing: {e}", exc_info=True)
+            return f"Error processing request: {e}"
+
+    def _convert_mcp_tools_to_openai_format(self) -> List[Dict[str, Any]]:
+        """Convert MCP tools to OpenAI function format."""
+        openai_tools = []
+        for tool in self.mcp_tools:
+            openai_tool = {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("inputSchema", {})
+                }
+            }
+            openai_tools.append(openai_tool)
+        return openai_tools
+
+    async def _handle_tool_calls_litellm(self, tool_calls: List[Dict], original_query: str) -> str:
+        """Handle tool calls for non-Gemini backends."""
+        tool_results = []
+
+        for tool_call in tool_calls:
+            function_info = tool_call.get("function", {})
+            tool_name = function_info.get("name")
+            tool_args_str = function_info.get("arguments", "{}")
+
+            try:
+                tool_args = json.loads(tool_args_str) if isinstance(tool_args_str, str) else tool_args_str
+                logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+
+                tool_status, tool_content = await self.execute_mcp_tool(tool_name, tool_args)
+
+                if tool_status == "Success":
+                    tool_results.append(f"Tool '{tool_name}' executed successfully. Result: {tool_content}")
+                else:
+                    tool_results.append(f"Tool '{tool_name}' failed: {tool_status}")
+
+            except Exception as e:
+                logger.error(f"Error executing tool {tool_name}: {e}")
+                tool_results.append(f"Tool '{tool_name}' failed with error: {e}")
+
+        # Create follow-up message with tool results
+        if tool_results:
+            follow_up_message = f"Original query: {original_query}\n\nTool execution results:\n" + "\n".join(tool_results) + "\n\nPlease provide a summary response based on these results."
+            return await self.ai_backend.chat_async(follow_up_message)
+
+        return "Tool calls were requested but no results were generated."
+
+    async def _process_query_gemini(self, query: str) -> str:
+        """Legacy Gemini processing method with full MCP integration."""
+        logger.info(f"Processing query with Gemini: '{query}'")
         if not self.gemini_client:
             logger.error("process_query called but Gemini client not initialized.")
             return "Error: Gemini client not initialized. Please set your API key via settings."

@@ -34,13 +34,19 @@ async def initialize_chat_app():
     if chat_app is None:
         chat_app = MCPChatApp()
         try:
-            await chat_app.initialize_gemini()
+            # Try to initialize with default backend (Gemini)
+            if chat_app.requires_api_key():
+                api_key = os.getenv("GEMINI_API_KEY")
+                if api_key:
+                    await chat_app.set_api_key_and_reinitialize(api_key)
+                else:
+                    logger.warning("No API key found for default backend, skipping initialization")
             logger.info("MCPChatApp initialized successfully.")
         except Exception as e:
             logger.error(
                 f"Failed to initialize MCPChatApp: {e}", exc_info=True)
-            chat_app = None
-            raise
+            # Don't set chat_app to None - keep it for later initialization
+            logger.warning("Chat app created but not fully initialized")
     return chat_app
 
 
@@ -117,10 +123,11 @@ async def set_api_key_async(api_key):
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
         await app.set_api_key_and_reinitialize(api_key)
-        return {"status": "success", "message": "API Key set and Gemini client re-initialized."}, 200
+        backend = app.get_backend()
+        return {"status": "success", "message": f"API Key set for {backend} backend."}, 200
     except Exception as e:
         logger.error(
-            f"Error setting API key and re-initializing: {e}", exc_info=True)
+            f"Error setting API key: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set API key: {e}"}, 500
 
 # --- Model Switching Async Functions ---
@@ -129,12 +136,15 @@ async def set_model_async(model_name):
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
-        app.set_gemini_model(model_name)
-        return {"status": "success", "message": f"Gemini model set to {model_name}."}, 200
-    except ValueError as e: # Catch unsupported model error
-        return {"status": "error", "message": str(e)}, 400
+        success = app.set_model(model_name)
+        if success:
+            backend = app.get_backend()
+            return {"status": "success", "message": f"Model set to {model_name} for {backend} backend."}, 200
+        else:
+            available_models = await app.list_available_models()
+            return {"status": "error", "message": f"Invalid model: {model_name}. Available: {', '.join(available_models)}"}, 400
     except Exception as e:
-        logger.error(f"Error setting Gemini model to {model_name}: {e}", exc_info=True)
+        logger.error(f"Error setting model to {model_name}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set model: {e}"}, 500
 
 async def get_model_async():
@@ -142,27 +152,68 @@ async def get_model_async():
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
-        current_model = app.get_gemini_model()
+        current_model = app.get_model()
         return {"status": "success", "model": current_model}, 200
     except Exception as e:
-        logger.error(f"Error getting current Gemini model: {e}", exc_info=True)
+        logger.error(f"Error getting current model: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to get model: {e}"}, 500
 
 async def list_models_async():
     app = await initialize_chat_app()
     if not app:
-        # Return empty list even if app not fully initialized, as the list is static for now
-        # If fetching dynamically, would return error here.
-        temp_app = MCPChatApp() # Get default list
-        return {"status": "success", "models": temp_app.get_available_models()}, 200
-        # return {"status": "error", "message": "Chat app not initialized"}, 500
+        # Return empty list even if app not fully initialized
+        temp_app = MCPChatApp()
+        try:
+            available_models = await temp_app.list_available_models()
+            return {"status": "success", "models": available_models}, 200
+        except Exception as e:
+            logger.error(f"Error listing models with temp app: {e}")
+            return {"status": "error", "message": f"Failed to list models: {e}"}, 500
     try:
-        available_models = app.get_available_models()
+        available_models = await app.list_available_models()
         return {"status": "success", "models": available_models}, 200
     except Exception as e:
-        logger.error(f"Error listing available Gemini models: {e}", exc_info=True)
+        logger.error(f"Error listing available models: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to list models: {e}"}, 500
 # --- End Model Switching Async Functions ---
+
+# --- Backend Management Async Functions ---
+async def set_backend_async(backend_type):
+    app = await initialize_chat_app()
+    if not app:
+        return {"status": "error", "message": "Chat app not initialized"}, 500
+    try:
+        success = app.set_backend(backend_type)
+        if success:
+            return {"status": "success", "message": f"Backend set to {backend_type}"}, 200
+        else:
+            return {"status": "error", "message": f"Invalid backend type: {backend_type}"}, 400
+    except Exception as e:
+        logger.error(f"Error setting backend to {backend_type}: {e}", exc_info=True)
+        return {"status": "error", "message": f"Failed to set backend: {e}"}, 500
+
+async def get_backend_async():
+    app = await initialize_chat_app()
+    if not app:
+        return {"status": "error", "message": "Chat app not initialized"}, 500
+    try:
+        backend = app.get_backend()
+        return {"status": "success", "backend": backend}, 200
+    except Exception as e:
+        logger.error(f"Error getting backend: {e}", exc_info=True)
+        return {"status": "error", "message": f"Failed to get backend: {e}"}, 500
+
+async def validate_backend_async():
+    app = await initialize_chat_app()
+    if not app:
+        return {"status": "error", "message": "Chat app not initialized"}, 500
+    try:
+        validation = app.ai_backend.validate_configuration()
+        return {"status": "success", "validation": validation}, 200
+    except Exception as e:
+        logger.error(f"Error validating backend: {e}", exc_info=True)
+        return {"status": "error", "message": f"Failed to validate backend: {e}"}, 500
+# --- End Backend Management Async Functions ---
 
 @flask_app.route('/chat', methods=['POST'])
 def chat():
@@ -324,9 +375,8 @@ def get_model():
 @flask_app.route('/list-models', methods=['GET'])
 def list_models():
     if not loop or not loop.is_running():
-        # Allow listing even if loop isn't fully ready, as list is static
+        # Allow listing even if loop isn't fully ready, as list may be available
         pass
-        # return jsonify({"status": "error", "message": "Backend loop not running."}), 500
 
     # Run directly if loop isn't ready, otherwise use threadsafe call
     if loop and loop.is_running():
@@ -344,15 +394,67 @@ def list_models():
         # Fallback for when loop isn't running (e.g., during startup errors)
         try:
             temp_app = MCPChatApp()
-            models = temp_app.get_available_models()
+            models = asyncio.run(temp_app.list_available_models())
             return jsonify({"status": "success", "models": models}), 200
         except Exception as e:
             logger.error(f"Error listing models directly (no loop): {e}", exc_info=True)
             return jsonify({"status": "error", "message": f"Error listing models: {e}"}), 500
 # --- End Model Switching Endpoints ---
 
+# --- Backend Management Endpoints ---
+@flask_app.route('/set-backend', methods=['POST'])
+def set_backend():
+    data = request.get_json()
+    backend_type = data.get('backend')
+    if not backend_type:
+        return jsonify({"status": "error", "message": "No backend type provided."}), 400
+    if not loop or not loop.is_running():
+        return jsonify({"status": "error", "message": "Backend loop not running."}), 500
+
+    future = asyncio.run_coroutine_threadsafe(set_backend_async(backend_type), loop)
+    try:
+        result, status_code = future.result(timeout=10)
+        return jsonify(result), status_code
+    except asyncio.TimeoutError:
+        logger.error(f"Setting backend to {backend_type} timed out.")
+        return jsonify({"status": "error", "message": "Error: Setting backend timed out."}), 504
+    except Exception as e:
+        logger.error(f"Error getting result from set_backend future: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": f"Error setting backend: {e}"}), 500
+
+@flask_app.route('/get-backend', methods=['GET'])
+def get_backend():
+    if not loop or not loop.is_running():
+        return jsonify({"status": "error", "message": "Backend loop not running."}), 500
+
+    future = asyncio.run_coroutine_threadsafe(get_backend_async(), loop)
+    try:
+        result, status_code = future.result(timeout=5)
+        return jsonify(result), status_code
+    except asyncio.TimeoutError:
+        logger.error("Getting backend timed out.")
+        return jsonify({"status": "error", "message": "Error: Getting backend timed out."}), 504
+    except Exception as e:
+        logger.error(f"Error getting result from get_backend future: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": f"Error getting backend: {e}"}), 500
+
+@flask_app.route('/validate-backend', methods=['GET'])
+def validate_backend():
+    if not loop or not loop.is_running():
+        return jsonify({"status": "error", "message": "Backend loop not running."}), 500
+
+    future = asyncio.run_coroutine_threadsafe(validate_backend_async(), loop)
+    try:
+        result, status_code = future.result(timeout=10)
+        return jsonify(result), status_code
+    except asyncio.TimeoutError:
+        logger.error("Validating backend timed out.")
+        return jsonify({"status": "error", "message": "Error: Validating backend timed out."}), 504
+    except Exception as e:
+        logger.error(f"Error getting result from validate_backend future: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": f"Error validating backend: {e}"}), 500
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='MCP Gemini Flask Backend')
+    parser = argparse.ArgumentParser(description='MCP Multi-Backend Flask Server')
     parser.add_argument('--port', type=int, default=5001,
                         help='Port to run the backend on')
     args = parser.parse_args()
@@ -378,12 +480,18 @@ if __name__ == '__main__':
                 f"Error during chat app initialization: {e}", exc_info=True)
             # Don't exit if init fails due to no key, allow setting it later
             logger.warning(
-                "Initial Gemini initialization failed, likely no API key. Waiting for key to be set.")
-            # chat_app will still be None if it failed badly
+                "Initial backend initialization failed, likely no API key. Backend can be configured later via API.")
+            # Ensure we have a chat_app instance even if init fails
             if chat_app is None:
-                chat_app = MCPChatApp()  # Create instance even if init fails
-                logger.info(
-                    "Created MCPChatApp instance despite initial Gemini failure.")
+                loop_for_init = asyncio.run_coroutine_threadsafe(
+                    initialize_chat_app(), loop)
+                try:
+                    loop_for_init.result(timeout=5)
+                except:
+                    pass  # Ignore errors, we'll create manually
+                if chat_app is None:
+                    chat_app = MCPChatApp()
+                    logger.info("Created MCPChatApp instance despite initialization failure.")
 
     else:
         logger.error("Asyncio loop not available after waiting.")
