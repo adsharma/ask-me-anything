@@ -12,7 +12,8 @@ const pythonPort = 5001;
 const BACKEND_TYPES = {
   GEMINI: 'gemini',
   OLLAMA: 'ollama',
-  OPENAI: 'openai', // For MLX via OpenAI-compatible API
+  OPENAI: 'openai',
+  MLX: 'mlx', // For MLX via OpenAI-compatible local server
   ANTHROPIC: 'anthropic',
   COHERE: 'cohere'
 };
@@ -182,6 +183,31 @@ ipcMain.handle("set-backend", async (event, backendType) => {
   if (Object.values(BACKEND_TYPES).includes(backendType)) {
     currentBackend = backendType;
     console.log(`[set-backend] Backend set to: ${currentBackend}`);
+
+    // Inform the Python backend about the backend change
+    try {
+      if (pythonPort) {
+        const response = await fetch(`http://127.0.0.1:${pythonPort}/set-backend`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ backend: backendType }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        console.log(`[set-backend] Python backend informed about backend change to: ${backendType}`);
+      }
+    } catch (error) {
+      console.error(`[set-backend] Error informing Python backend about backend change:`, error);
+      // Don't fail the entire operation if we can't inform the Python backend
+      // The local backend is still set correctly
+    }
+
     return { success: true, backend: currentBackend };
   } else {
     throw new Error(`Invalid backend type: ${backendType}`);
@@ -345,9 +371,29 @@ ipcMain.handle("save-api-key", async (event, apiKey, model, backend) => {
 
     // Set backend if provided
     if (backend && Object.values(BACKEND_TYPES).includes(backend)) {
-      // For LiteLLM, we don't need to set backend separately as it's part of the model name
       currentBackend = backend;
       console.log(`[save-api-key] Backend updated to: ${currentBackend}`);
+
+      // Inform the Python backend about the backend change
+      try {
+        const backendResponse = await fetch(`http://127.0.0.1:${pythonPort}/set-backend`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ backend: backend }),
+        });
+
+        if (!backendResponse.ok) {
+          const errorData = await backendResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${backendResponse.status}`);
+        }
+
+        console.log(`[save-api-key] Python backend informed about backend change to: ${backend}`);
+      } catch (error) {
+        console.error(`[save-api-key] Error informing Python backend about backend change:`, error);
+        // Continue with the rest of the save process even if backend setting fails
+      }
     }
 
     // Set API key

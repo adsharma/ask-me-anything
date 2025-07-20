@@ -699,8 +699,13 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
         break;
       case 'openai':
         apiKeyLabel.textContent = 'OpenAI API Key:';
-        settingsApiKey.placeholder = 'Enter your OpenAI API key (for MLX via OpenAI-compatible API)';
+        settingsApiKey.placeholder = 'Enter your OpenAI API key';
         settingsApiKey.required = true;
+        break;
+      case 'mlx':
+        apiKeyLabel.textContent = 'API Key (Optional):';
+        settingsApiKey.placeholder = 'API key not required for local MLX models';
+        settingsApiKey.required = false;
         break;
       case 'anthropic':
         apiKeyLabel.textContent = 'Anthropic API Key:';
@@ -792,6 +797,13 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
     settingsBackendSelect.addEventListener('change', async () => {
       const selectedBackend = settingsBackendSelect.value;
       updateUIForBackend(selectedBackend);
+
+      // Set the backend on the main process
+      try {
+        await window.electronAPI.setBackend(selectedBackend);
+      } catch (error) {
+        console.error("Error setting backend:", error);
+      }
 
       // Reload models for new backend
       settingsModelSelect.innerHTML = '<option value="">Loading models...</option>';

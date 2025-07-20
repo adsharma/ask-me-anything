@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld("settingsAPI", {
   getModelHelpers: () => ipcRenderer.invoke("get-model-helpers"),
   getCurrentBackend: () => ipcRenderer.invoke("get-current-backend"),
   setBackend: (backendType) => ipcRenderer.invoke("set-backend", backendType),
+  // Integrated settings save function
+  saveSettings: (apiKey, model, backend) => ipcRenderer.invoke("save-api-key", apiKey, model, backend),
 });

@@ -34,8 +34,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         break;
       case 'openai':
         apiKeyLabel.textContent = 'OpenAI API Key:';
-        helpText.textContent = 'Enter your OpenAI API key (for MLX via OpenAI-compatible API)';
+        helpText.textContent = 'Enter your OpenAI API key';
         apiKeyInput.required = true;
+        break;
+      case 'mlx':
+        apiKeyLabel.textContent = 'API Key (Optional):';
+        helpText.textContent = 'API key not required for local MLX models via OpenAI-compatible server';
+        apiKeyInput.required = false;
         break;
       case 'anthropic':
         apiKeyLabel.textContent = 'Anthropic API Key:';
@@ -130,8 +135,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Clear model dropdown and reload models for new backend
     modelSelect.innerHTML = '<option value="">Loading models...</option>';
     try {
-      // For LiteLLM, we don't need to set backend on the server side
-      // as the provider is specified in the model name
+      // Set the backend on the server side first so it knows which models to list
+      await window.settingsAPI.setBackend(selectedBackend);
+      // Then populate models for the new backend
       await populateModels();
     } catch (error) {
       console.error("Error changing backend:", error);

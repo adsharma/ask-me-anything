@@ -14,11 +14,15 @@ This application now supports multiple AI backends through LiteLLM integration:
 - **API Key Required**: No (local models)
 - **Setup**: Install [Ollama](https://ollama.ai/) and pull your desired models
 
-### OpenAI (including MLX)
-- **Models**: `openai/gpt-4o`, `openai/gpt-4o-mini`, `openai/mlx-community/model_name`
-- **API Key Required**: Yes (for OpenAI models)
+### OpenAI
+- **Models**: `openai/gpt-4o`, `openai/gpt-4o-mini`, `openai/gpt-3.5-turbo`
+- **API Key Required**: Yes
 - **Setup**: Get your API key from [OpenAI](https://platform.openai.com/api-keys)
-- **MLX Support**: Use MLX models via OpenAI-compatible API
+
+### MLX (Local)
+- **Models**: `mlx/mlx-community/model_name` (via OpenAI-compatible local server)
+- **API Key Required**: No (local models)
+- **Setup**: Set up MLX with OpenAI-compatible server locally
 
 ### Anthropic Claude
 - **Models**: `anthropic/claude-3-5-sonnet-20241022`, `anthropic/claude-3-5-haiku-20241022`
@@ -37,7 +41,8 @@ All models follow the LiteLLM naming convention: `provider/model_name`
 Examples:
 - `gemini/gemini-2.5-flash-preview-04-17`
 - `ollama/qwen3:14b`
-- `openai/mlx-community/Qwen2.5-Coder-32B-Instruct-4bit`
+- `openai/gpt-4o`
+- `mlx/mlx-community/Qwen2.5-Coder-32B-Instruct-4bit`
 - `anthropic/claude-3-5-sonnet-20241022`
 - `cohere/command-r-plus`
 

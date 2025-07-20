@@ -136,7 +136,7 @@ async def set_model_async(model_name):
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
-        success = app.set_model(model_name)
+        success = await app.set_model_async(model_name)
         if success:
             backend = app.get_backend()
             return {"status": "success", "message": f"Model set to {model_name} for {backend} backend."}, 200
@@ -208,7 +208,7 @@ async def validate_backend_async():
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
-        validation = app.ai_backend.validate_configuration()
+        validation = app.validate_configuration()
         return {"status": "success", "validation": validation}, 200
     except Exception as e:
         logger.error(f"Error validating backend: {e}", exc_info=True)

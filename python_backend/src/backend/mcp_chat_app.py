@@ -32,7 +32,6 @@ class MCPChatApp:
             self.ai_backend.set_model(model_name)
 
         # Legacy Gemini-specific properties (for backward compatibility)
-        self.gemini_model_name = self.ai_backend.get_model()
         self.gemini_sync_client: Optional[genai.Client] = None
         self.gemini_client: Optional[genai.client.AsyncClient] = None
 
@@ -57,10 +56,11 @@ class MCPChatApp:
 
     def set_model(self, model_name: str) -> bool:
         """Set the model for the current backend."""
-        success = self.ai_backend.set_model(model_name)
-        if success:
-            self.gemini_model_name = model_name  # Keep legacy property in sync
-        return success
+        return self.ai_backend.set_model(model_name)
+
+    async def set_model_async(self, model_name: str) -> bool:
+        """Async version that validates against dynamic model lists."""
+        return await self.ai_backend.set_model_async(model_name)
 
     def get_model(self) -> str:
         """Get the current model name."""
@@ -90,25 +90,9 @@ class MCPChatApp:
                 self.api_key = None
                 raise
 
-    # Legacy Gemini compatibility methods
-    def set_gemini_model(self, model_name: str):
-        """Legacy method for setting Gemini model."""
-        if self.ai_backend.get_backend() != "gemini":
-            logger.warning(f"set_gemini_model called but current backend is {self.ai_backend.get_backend()}")
-            return
-
-        success = self.set_model(model_name)
-        if not success:
-            available_models = asyncio.run(self.list_available_models())
-            raise ValueError(f"Unsupported model name: {model_name}. Available: {', '.join(available_models)}")
-
-    def get_gemini_model(self) -> str:
-        """Legacy method for getting Gemini model."""
-        return self.get_model()
-
-    def get_available_models(self) -> List[str]:
-        """Legacy method for getting available models."""
-        return asyncio.run(self.list_available_models())
+    def validate_configuration(self) -> Dict[str, Any]:
+        """Validate the current backend configuration."""
+        return self.ai_backend.validate_configuration()
 
     async def initialize_gemini(self):
         """Legacy method for Gemini initialization."""
@@ -466,7 +450,7 @@ class MCPChatApp:
             # Create system prompt for MCP context
             system_prompt = None
             if self.mcp_tools:
-                tool_descriptions = [f"- {tool['name']}: {tool.get('description', 'No description')}" for tool in self.mcp_tools]
+                tool_descriptions = [f"- {tool.name}: {tool.description or 'No description'}" for tool in self.mcp_tools]
                 system_prompt = f"You have access to the following tools:\n" + "\n".join(tool_descriptions)
 
             # Send request to backend
@@ -495,12 +479,19 @@ class MCPChatApp:
         """Convert MCP tools to OpenAI function format."""
         openai_tools = []
         for tool in self.mcp_tools:
+            # Extract schema properly from MCP tool object
+            input_schema = {}
+            if hasattr(tool.inputSchema, 'model_dump'):
+                input_schema = tool.inputSchema.model_dump(exclude_none=True)
+            elif isinstance(tool.inputSchema, dict):
+                input_schema = tool.inputSchema
+
             openai_tool = {
                 "type": "function",
                 "function": {
-                    "name": tool["name"],
-                    "description": tool.get("description", ""),
-                    "parameters": tool.get("inputSchema", {})
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "parameters": input_schema
                 }
             }
             openai_tools.append(openai_tool)
@@ -557,12 +548,13 @@ class MCPChatApp:
 
         try:
             # Ensure the currently set model name is used
-            logger.debug(f"Generating content with model: {self.gemini_model_name}")
-            logger.info(f"Sending request to Gemini model: {self.gemini_model_name}")
+            current_model = self.ai_backend.get_model()
+            logger.debug(f"Generating content with model: {current_model}")
+            logger.info(f"Sending request to Gemini model: {current_model}")
             logger.debug(f"Request contents: {self.chat_history}")
             logger.debug(f"Request config: {config}")
             response = await self.gemini_client.models.generate_content(
-                model=self.gemini_model_name, # Uses the instance variable
+                model=current_model,
                 contents=self.chat_history,
                 config=config,
             )
@@ -630,10 +622,11 @@ class MCPChatApp:
                         role="tool", parts=tool_response_parts))
 
                     # Ensure the currently set model name is used after tool call
-                    logger.info(f"Sending tool results back to Gemini model: {self.gemini_model_name}")
+                    current_model = self.ai_backend.get_model()
+                    logger.info(f"Sending tool results back to Gemini model: {current_model}")
                     logger.debug(f"Request contents (with tool results): {self.chat_history}")
                     response = await self.gemini_client.models.generate_content(
-                        model=self.gemini_model_name, # Uses the instance variable
+                        model=current_model,
                         contents=self.chat_history,
                         config=config,
                     )

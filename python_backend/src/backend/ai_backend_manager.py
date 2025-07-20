@@ -38,9 +38,9 @@ class AIBackendManager:
                 "models": []  # Will be fetched dynamically
             },
             "mlx": {
-                "default_model": "mlx-community/Llama-3.2-3B-Instruct-4bit",
+                "default_model": "baidu/ERNIE-4.5-0.3B-PT",
                 "requires_api_key": False,
-                "base_url": "http://localhost:8080",  # Default MLX OpenAI-compatible server
+                "base_url": "http://localhost:8081/v1",  # Default MLX OpenAI-compatible server
                 "models": []  # Will be fetched dynamically
             },
             "openai": {
@@ -82,7 +82,25 @@ class AIBackendManager:
 
     def set_model(self, model_name: str) -> bool:
         """Set the current model for the active backend."""
-        available_models = self.list_models()
+        # For synchronous validation, we'll use cached models or basic validation
+        backend_config = self.backend_settings[self.current_backend]
+
+        # For static model lists (Gemini, OpenAI), check immediately
+        if backend_config["models"]:
+            if model_name not in backend_config["models"]:
+                logger.error(f"Model {model_name} not available for backend {self.current_backend}")
+                return False
+        # For dynamic backends (Ollama, MLX), we'll allow the model and validate later
+        else:
+            logger.info(f"Setting model {model_name} for {self.current_backend} (will validate dynamically)")
+
+        self.current_model = model_name
+        logger.info(f"Set model to {model_name} for backend {self.current_backend}")
+        return True
+
+    async def set_model_async(self, model_name: str) -> bool:
+        """Async version of set_model that can validate against dynamic model lists."""
+        available_models = await self.list_models()
         if model_name not in available_models:
             logger.error(f"Model {model_name} not available for backend {self.current_backend}")
             return False

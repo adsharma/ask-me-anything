@@ -4,14 +4,17 @@
 ## Backend Types Supported:
 - **Gemini**: Google's Gemini AI models (requires API key)
 - **Ollama**: Local Ollama models (no API key required)
-- **MLX**: Apple MLX models (no API key required)
+- **OpenAI**: OpenAI models (requires API key)
+- **MLX**: Apple MLX models via OpenAI-compatible local server (no API key required)
+- **Anthropic**: Anthropic Claude models (requires API key)
+- **Cohere**: Cohere models (requires API key)
 
 ## Python Backend Endpoints to Implement:
 
 ### 1. Set Backend Type
 ```
 POST /set-backend
-Body: {"backend": "gemini|ollama|mlx"}
+Body: {"backend": "gemini|ollama|openai|mlx|anthropic|cohere"}
 ```
 
 ### 2. List Models (backend-specific)
@@ -67,29 +70,44 @@ class AIBackendManager:
         self.current_backend = "gemini"  # default
         self.gemini_client = None
         self.ollama_client = None
+        self.openai_client = None
         self.mlx_client = None
-        
+        self.anthropic_client = None
+        self.cohere_client = None
+
     def set_backend(self, backend_type):
-        if backend_type in ["gemini", "ollama", "mlx"]:
+        if backend_type in ["gemini", "ollama", "openai", "mlx", "anthropic", "cohere"]:
             self.current_backend = backend_type
             return True
         return False
-        
+
     def list_models(self):
         if self.current_backend == "gemini":
             return self.get_gemini_models()
         elif self.current_backend == "ollama":
             return self.get_ollama_models()
+        elif self.current_backend == "openai":
+            return self.get_openai_models()
         elif self.current_backend == "mlx":
             return self.get_mlx_models()
-            
+        elif self.current_backend == "anthropic":
+            return self.get_anthropic_models()
+        elif self.current_backend == "cohere":
+            return self.get_cohere_models()
+
     def chat(self, message):
         if self.current_backend == "gemini":
             return self.gemini_chat(message)
         elif self.current_backend == "ollama":
             return self.ollama_chat(message)
+        elif self.current_backend == "openai":
+            return self.openai_chat(message)
         elif self.current_backend == "mlx":
             return self.mlx_chat(message)
+        elif self.current_backend == "anthropic":
+            return self.anthropic_chat(message)
+        elif self.current_backend == "cohere":
+            return self.cohere_chat(message)
 ```
 
 ## Frontend Integration:
