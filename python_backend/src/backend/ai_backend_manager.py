@@ -40,7 +40,7 @@ class AIBackendManager:
             "mlx": {
                 "default_model": "baidu/ERNIE-4.5-0.3B-PT",
                 "requires_api_key": False,
-                "base_url": "http://localhost:8081/v1",  # Default MLX OpenAI-compatible server
+                "base_url": "http://localhost:8081",  # Default MLX OpenAI-compatible server
                 "models": []  # Will be fetched dynamically
             },
             "openai": {
@@ -199,7 +199,7 @@ class AIBackendManager:
             kwargs["api_base"] = backend_config["base_url"]
         elif self.current_backend == "mlx":
             backend_config = self.backend_settings["mlx"]
-            kwargs["api_base"] = backend_config["base_url"]
+            kwargs["api_base"] = f"{backend_config['base_url']}/v1"
             kwargs["api_key"] = "dummy"  # MLX doesn't need real API key
         elif self.current_backend == "gemini":
             if self.api_key:
