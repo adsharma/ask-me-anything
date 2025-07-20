@@ -1,4 +1,4 @@
-# MCP AI Chat - Multi-Backend Support
+# Ask Me Anything - Multi-Backend Support
 
 This application now supports multiple AI backends through LiteLLM integration:
 

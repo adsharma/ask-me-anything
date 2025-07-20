@@ -1,22 +1,21 @@
 <div align="center">
   <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-ai-desktop/assets/app_icon.png" width="128" height="128" alt="MCP AI Chat Logo">
 
-  <h1>MCP AI Chat</h1>
+  <h1>Ask Me Anything</h1>
 
   <p>
-    The MCP AI app is a cross-platform desktop application that creates a seamless chat interface for Google's Gemini AI models with extensible capabilities through a Model Context Protocol (MCP) framework.
+    Ask me anything app is a cross-platform desktop application that creates a seamless chat interface for AI models with extensible capabilities through a Model Context Protocol (MCP) framework.
   </p>
 </div>
 
 ## ✨ Features
 
-- **🤖 Gemini Integration:** Seamless chat interface with Google's Gemini models (configurable via Settings).
+- **🤖 Multiple LLM Integration:** Seamless chat interface with Ollama, MLX, Google/OpenAI/Anthropic (configurable via Settings).
 - **🔧 Extensible Tools (MCP):** Connect external tools and data sources via the Model Context Protocol.
   - Supports Python-based MCP servers (added via file path).
   - Supports command-based MCP servers (e.g., Node.js) defined in a JSON configuration file.
 - **🖥️ Cross-Platform:** Runs on macOS and Windows (Electron build).
-- **📊 Tool Status UI:** Provides visual feedback when Gemini is calling an MCP tool and whether it succeeded or failed.
-- **⚙️ Model Selection:** Choose different Gemini models (e.g., 1.5 Flash, 1.5 Pro, 2.5 Pro Exp) through the Settings dialog.
+- **📊 Tool Status UI:** Provides visual feedback when AI is calling an MCP tool and whether it succeeded or failed.
 - **📝 Markdown & LaTeX Rendering:** Displays AI responses with formatting.
 
 ## Screenshots
@@ -28,7 +27,7 @@
 
 <p align="center">
   <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-ai-desktop/demo_images/BEvT6bS7bFJVVKK.png" width="80%" alt="Chat Interface">
-  <br><em>Main chat interface with Gemini</em>
+  <br><em>Main chat interface with LLM</em>
 </p>
 
 <p align="center">
@@ -38,7 +37,7 @@
 
 ## Overview
 
-This repository contains both a Python backend and an Electron-based desktop application for interacting with Gemini.
+This repository contains both a Python backend and an Electron-based desktop application for interacting with LLMs.
 
 ## Project Structure
 

@@ -1,7 +1,7 @@
 {
-  "name": "mcp-ai-desktop",
+  "name": "ask-me-anything",
   "version": "0.1.0",
-  "description": "Desktop chat app for AI backends (Gemini, Ollama, MLX) with MCP integration",
+  "description": "Ask Me Anything is a Personal Assistant",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -11,11 +11,10 @@
   "keywords": [
     "Electron",
     "AI",
-    "Gemini",
-    "Ollama",
-    "MLX",
-    "MCP",
-    "Chat"
+    "Assistant",
+    "Chat",
+    "Personal Assistant",
+    "Ask Me Anything"
   ],
   "author": "Your Name",
   "license": "MIT",
@@ -25,8 +24,8 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.yourcompany.mcpaichat",
-    "productName": "MCP AI Chat",
+    "appId": "com.yourcompany.askme",
+    "productName": "Ask Me Anything",
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",

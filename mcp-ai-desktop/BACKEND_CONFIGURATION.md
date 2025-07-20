@@ -1,4 +1,4 @@
-# Backend Configuration for MCP AI Chat
+# Backend Configuration for Ask Me Anything
 # This file shows how to configure the Python backend to support multiple AI providers
 
 ## Backend Types Supported:

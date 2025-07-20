@@ -88,7 +88,7 @@ function createWindow() {
     trafficLightPosition: {x: 15, y: 15},
     minWidth: 800,
     minHeight: 600,
-    title: "MCP AI Chat",
+    title: "Ask Me Anything",
     backgroundColor: "#fdfcf7",
     icon: path.join(
       __dirname,

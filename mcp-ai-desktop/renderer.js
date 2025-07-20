@@ -492,7 +492,7 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
     try {
       pythonPort = await window.electronAPI.getPythonPort();
       console.log(`Python backend running on port: ${pythonPort}`);
-      addMessage("Welcome to GemCP Chat!", "ai"); // Changed from "system" to "ai"
+      addMessage("Ask me Anything!", "ai"); // Changed from "system" to "ai"
       await fetchAndRenderServers();
       if (!serverRefreshInterval) {
         serverRefreshInterval = setInterval(fetchAndRenderServers, 10000);
