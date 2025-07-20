@@ -5,7 +5,7 @@
   <p>
     Ask me anything app is a cross-platform desktop application that creates a seamless chat interface for AI models with extensible capabilities through a Model Context Protocol (MCP) framework.
 
-    It is a fork of a previous project that was [Gemini specific](https://github.com/kkrishnan90/gemini-desktop/)
+    It is a fork of a previous project that was <a href="https://github.com/kkrishnan90/gemini-desktop/">Gemini specific</a>
   </p>
 </div>
 
