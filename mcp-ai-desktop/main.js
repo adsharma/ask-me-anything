@@ -261,6 +261,21 @@ ipcMain.handle("read-file-content", async (event, filePath) => {
   }
 });
 
+ipcMain.handle("read-image-as-base64", async (event, filePath) => {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error("Invalid file path provided.");
+  }
+  try {
+    console.log(`[read-image-as-base64] Reading image: ${filePath}`);
+    const imageBuffer = await fs.readFile(filePath);
+    const base64Data = imageBuffer.toString('base64');
+    return base64Data;
+  } catch (error) {
+    console.error(`[read-image-as-base64] Error reading image ${filePath}:`, error);
+    throw new Error(`Failed to read image: ${error.message}`);
+  }
+});
+
 // --- Model Switching IPC Handlers ---
 
 ipcMain.handle("list-models", async () => {

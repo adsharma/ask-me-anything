@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openSettingsDialog: () => ipcRenderer.invoke("open-settings-dialog"),
   // Expose the new file reading function
   readFileContent: (filePath) => ipcRenderer.invoke("read-file-content", filePath),
+  // Image handling
+  readImageAsBase64: (filePath) => ipcRenderer.invoke("read-image-as-base64", filePath),
   // Backend functions
   getBackendTypes: () => ipcRenderer.invoke("get-backend-types"),
   getModelHelpers: () => ipcRenderer.invoke("get-model-helpers"),

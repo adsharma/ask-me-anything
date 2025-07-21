@@ -10,6 +10,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const serverList = document.getElementById("server-list");
   const settingsBtn = document.getElementById("settings-btn");
 
+  // Image upload elements
+  const imageBtn = document.getElementById("image-btn");
+  const imageInput = document.getElementById("image-input");
+  const imagePreviewContainer = document.getElementById("image-preview-container");
+  const previewImage = document.getElementById("preview-image");
+  const removeImageBtn = document.getElementById("remove-image-btn");
+
   // Settings panel elements
   const settingsPanel = document.getElementById("settings-panel");
   const settingsOverlay = document.getElementById("settings-overlay");
@@ -22,6 +29,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let pythonPort = null;
   let serverRefreshInterval = null;
+  let selectedImageData = null; // Store the selected image data
 
   function renderLaTeX(text) {
     const latexPlaceholders = [];
@@ -304,22 +312,144 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
   }
 
+  // --- Image Handling Functions ---
+
+  function clearSelectedImage() {
+    selectedImageData = null;
+    imagePreviewContainer.style.display = 'none';
+    previewImage.src = '';
+    imageInput.value = ''; // Clear the file input
+  }
+
+  async function handleImageSelection(file) {
+    if (!file || !file.type.startsWith('image/')) {
+      addMessage("Please select a valid image file.", "system");
+      return;
+    }
+
+    // Check file size (limit to 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      addMessage("Image file is too large. Please select an image smaller than 10MB.", "system");
+      return;
+    }
+
+    try {
+      // Show processing state
+      imageBtn.classList.add('processing');
+      imageBtn.title = 'Processing image...';
+
+      // Create a temporary file path for preview
+      const objectUrl = URL.createObjectURL(file);
+      previewImage.src = objectUrl;
+      imagePreviewContainer.style.display = 'block';
+
+      // Convert to base64 for sending to backend
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1]; // Remove data:image/...;base64, prefix
+        selectedImageData = {
+          data: base64Data,
+          mimeType: file.type,
+          name: file.name
+        };
+
+        // Remove processing state
+        imageBtn.classList.remove('processing');
+        imageBtn.title = 'Add image';
+
+        // Clean up object URL to prevent memory leaks
+        URL.revokeObjectURL(objectUrl);
+      };
+      reader.onerror = function() {
+        console.error("Error reading file");
+        addMessage("Error reading image file. Please try again.", "system");
+        clearSelectedImage();
+        imageBtn.classList.remove('processing');
+        imageBtn.title = 'Add image';
+        URL.revokeObjectURL(objectUrl);
+      };
+      reader.readAsDataURL(file);
+
+    } catch (error) {
+      console.error("Error processing image:", error);
+      addMessage("Error processing image. Please try again.", "system");
+      clearSelectedImage();
+      imageBtn.classList.remove('processing');
+      imageBtn.title = 'Add image';
+    }
+  }
+
+  function createImageMessage(imageData, text = '') {
+    const messageDiv = document.createElement("div");
+    messageDiv.classList.add("message", "user");
+
+    const contentDiv = document.createElement("div");
+    contentDiv.classList.add("message-content");
+
+    // Add image
+    const img = document.createElement("img");
+    img.classList.add("message-image");
+    img.src = `data:${imageData.mimeType};base64,${imageData.data}`;
+    img.alt = imageData.name || "Uploaded image";
+    contentDiv.appendChild(img);
+
+    // Add text if provided
+    if (text.trim()) {
+      const textDiv = document.createElement("div");
+      textDiv.classList.add("message-text");
+      textDiv.textContent = text;
+      contentDiv.appendChild(textDiv);
+    }
+
+    messageDiv.appendChild(contentDiv);
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return messageDiv;
+  }
+
+  // --- End Image Handling Functions ---
+
   // --- End Helper Functions ---
 
   async function sendMessage() {
     const message = messageInput.value.trim();
-    if (!message || !pythonPort) {
-      if (!pythonPort) {
-        addMessage("Error: Backend not connected.", "system");
-      }
+    if (!message && !selectedImageData) {
+      return; // Don't send empty messages without image
+    }
+
+    if (!pythonPort) {
+      addMessage("Error: Backend not connected.", "system");
       return;
     }
-addMessage(message, "user");
-messageInput.value = "";
-messageInput.style.height = "auto"; // Reset height after sending
 
-// Add a temporary loading message for AI response
-const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class name
+    // Create message data object
+    const messageData = {
+      text: message || "" // Ensure we always send a text field, even if empty
+    };
+
+    // Add image if selected
+    if (selectedImageData) {
+      messageData.image = selectedImageData;
+      // Display the user message with image
+      createImageMessage(selectedImageData, message);
+      // Clear the selected image
+      clearSelectedImage();
+
+      // Add a helpful status message for image processing
+      if (!message.trim()) {
+        addMessage("Processing image...", "system");
+      }
+    } else {
+      // Display regular text message
+      addMessage(message, "user");
+    }
+
+    messageInput.value = "";
+    messageInput.style.height = "auto"; // Reset height after sending
+
+    // Add a temporary loading message for AI response
+    const loadingMessageDiv = addMessage("...", "ai-loading");
 
     try {
       const response = await fetch(`http://127.0.0.1:${pythonPort}/chat`, {
@@ -327,7 +457,7 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({message: message}),
+        body: JSON.stringify({message: messageData}),
       });
       if (!response.ok) {
         const errorData = await response
@@ -492,7 +622,8 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
     try {
       pythonPort = await window.electronAPI.getPythonPort();
       console.log(`Python backend running on port: ${pythonPort}`);
-      addMessage("Ask me Anything!", "ai"); // Changed from "system" to "ai"
+      addMessage("Ask me Anything!", "ai");
+      addMessage("💡 You can now upload images by clicking the image button or dragging and dropping them into the chat!", "system");
       await fetchAndRenderServers();
       if (!serverRefreshInterval) {
         serverRefreshInterval = setInterval(fetchAndRenderServers, 10000);
@@ -522,6 +653,35 @@ const loadingMessageDiv = addMessage("...", "ai-loading"); // Use valid class na
   messageInput.addEventListener("input", () => {
     messageInput.style.height = "auto";
     messageInput.style.height = `${Math.min(messageInput.scrollHeight, 150)}px`;
+  });
+
+  // Image upload event listeners
+  imageBtn.addEventListener("click", () => {
+    imageInput.click();
+  });
+
+  imageInput.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      handleImageSelection(file);
+    }
+  });
+
+  removeImageBtn.addEventListener("click", () => {
+    clearSelectedImage();
+  });
+
+  // Drag and drop support for images
+  document.addEventListener("dragover", (event) => {
+    event.preventDefault();
+  });
+
+  document.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const files = event.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+      handleImageSelection(files[0]);
+    }
   });
 
   addServerBtn.addEventListener("click", async () => {

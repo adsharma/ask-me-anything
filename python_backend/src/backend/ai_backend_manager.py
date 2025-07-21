@@ -214,14 +214,31 @@ class AIBackendManager:
 
         return kwargs
 
-    async def chat_async(self, message: str, system_prompt: str = None, tools: List[Dict] = None) -> str:
+    async def chat_async(self, message: str, system_prompt: str = None, tools: List[Dict] = None, image_data=None) -> str:
         """Send a chat message to the current backend and return the response."""
         try:
             # Prepare messages
             messages = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": message})
+
+            # Prepare user message content
+            if image_data:
+                # For models that support vision (OpenAI, Claude, etc.)
+                user_content = [{"type": "text", "text": message}]
+
+                # Add image content
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image_data['mimeType']};base64,{image_data['data']}"
+                    }
+                })
+
+                messages.append({"role": "user", "content": user_content})
+                logger.info(f"Adding image to request: {image_data.get('name', 'unknown')}")
+            else:
+                messages.append({"role": "user", "content": message})
 
             # Prepare LiteLLM parameters
             model_name = self._prepare_litellm_model_name()

@@ -268,6 +268,23 @@ body {
   box-sizing: border-box;
 }
 
+.message-content .message-image {
+  max-width: 300px;
+  max-height: 300px;
+  border-radius: 8px;
+  margin: 8px 0;
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.message-content .message-text {
+  margin-top: 8px;
+}
+
+.message-content .message-text:first-child {
+  margin-top: 0;
+}
+
 .message.user .message-content {
   background-color: var(--user-message-bg);
   color: var(--user-message-text);
@@ -341,12 +358,99 @@ body {
 
 .input-area {
   display: flex;
+  flex-direction: column;
   padding: 18px 25px;
   border-top: 1px solid var(--border-color);
   background-color: var(--input-bg);
-  align-items: flex-end;
   min-height: var(--input-area-min-height);
   box-sizing: border-box;
+}
+
+.image-preview-container {
+  margin-bottom: 12px;
+}
+
+.image-preview {
+  position: relative;
+  display: inline-block;
+  max-width: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.image-preview img {
+  width: 100%;
+  height: auto;
+  max-height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.remove-image-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.remove-image-btn:hover {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.input-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+#image-btn {
+  background-color: var(--sidebar-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+#image-btn:hover {
+  background-color: var(--accent-color);
+  color: var(--user-message-text);
+  border-color: var(--accent-color);
+}
+
+#image-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+#image-btn.processing {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message.ai-loading .message-content {
+  background-color: var(--ai-message-bg);
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 #message-input {
@@ -355,7 +459,6 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 10px;
   resize: none;
-  margin-right: 12px;
   font-size: 1em;
   line-height: 1.5;
   min-height: 27px;

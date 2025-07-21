@@ -416,9 +416,21 @@ class MCPChatApp:
             error_msg = f"Error executing tool '{tool_name}': {e}"
             return error_msg, None
 
-    async def process_query(self, query: str) -> str:
+    async def process_query(self, query) -> str:
         """Process a query using the current AI backend."""
-        logger.info(f"Processing query with {self.ai_backend.get_backend()} backend: '{query}'")
+        # Handle both string queries and object queries with images
+        if isinstance(query, str):
+            query_text = query
+            image_data = None
+        elif isinstance(query, dict):
+            query_text = query.get('text', '')
+            image_data = query.get('image')
+        else:
+            return "Error: Invalid query format"
+
+        logger.info(f"Processing query with {self.ai_backend.get_backend()} backend: '{query_text[:100]}...'")
+        if image_data:
+            logger.info(f"Query includes image: {image_data.get('name', 'unknown')}")
 
         # Check if backend is configured
         config_validation = self.ai_backend.validate_configuration()
@@ -430,16 +442,16 @@ class MCPChatApp:
         try:
             # For Gemini backend, use the existing implementation with MCP tools
             if self.ai_backend.get_backend() == "gemini":
-                return await self._process_query_gemini(query)
+                return await self._process_query_gemini(query_text, image_data)
             else:
                 # For other backends, use LiteLLM
-                return await self._process_query_litellm(query)
+                return await self._process_query_litellm(query_text, image_data)
 
         except Exception as e:
             logger.error(f"Error processing query with {self.ai_backend.get_backend()}: {e}", exc_info=True)
             return f"An error occurred while processing your request: {e}"
 
-    async def _process_query_litellm(self, query: str) -> str:
+    async def _process_query_litellm(self, query: str, image_data=None) -> str:
         """Process query using LiteLLM for non-Gemini backends."""
         try:
             # Convert MCP tools to OpenAI function format if available
@@ -453,11 +465,12 @@ class MCPChatApp:
                 tool_descriptions = [f"- {tool.name}: {tool.description or 'No description'}" for tool in self.mcp_tools]
                 system_prompt = f"You have access to the following tools:\n" + "\n".join(tool_descriptions)
 
-            # Send request to backend
+            # Send request to backend with image support
             response = await self.ai_backend.chat_async(
                 message=query,
                 system_prompt=system_prompt,
-                tools=tools
+                tools=tools,
+                image_data=image_data
             )
 
             # Handle tool calls if present
@@ -528,17 +541,38 @@ class MCPChatApp:
 
         return "Tool calls were requested but no results were generated."
 
-    async def _process_query_gemini(self, query: str) -> str:
+    async def _process_query_gemini(self, query: str, image_data=None) -> str:
         """Legacy Gemini processing method with full MCP integration."""
         logger.info(f"Processing query with Gemini: '{query}'")
+        if image_data:
+            logger.info(f"Query includes image: {image_data.get('name', 'unknown')}")
+
         if not self.gemini_client:
             logger.error("process_query called but Gemini client not initialized.")
             return "Error: Gemini client not initialized. Please set your API key via settings."
 
-        # Append user message
+        # Prepare message parts
+        parts = [genai_types.Part(text=query)]
+
+        # Add image if provided
+        if image_data:
+            try:
+                import base64
+                image_bytes = base64.b64decode(image_data['data'])
+                parts.append(genai_types.Part(
+                    inline_data=genai_types.Blob(
+                        mime_type=image_data['mimeType'],
+                        data=image_bytes
+                    )
+                ))
+                logger.info("Successfully added image to Gemini request")
+            except Exception as e:
+                logger.error(f"Error processing image for Gemini: {e}")
+                return f"Error processing image: {e}"
+
+        # Append user message with text and optional image
         logger.debug("Appending user message to history.")
-        self.chat_history.append(genai_types.Content(
-            role="user", parts=[genai_types.Part(text=query)]))
+        self.chat_history.append(genai_types.Content(role="user", parts=parts))
 
         gemini_function_declarations = self.get_gemini_tool_declarations()
         gemini_tools = [genai_types.Tool(
