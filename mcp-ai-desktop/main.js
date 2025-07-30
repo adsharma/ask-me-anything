@@ -119,6 +119,10 @@ function createWindow() {
     if (settingsWindow) {
       settingsWindow.close();
     }
+    // Ensure app quits when main window is closed
+    if (process.platform !== "darwin") {
+      app.quit();
+    }
   });
 
   mainWindow.on("ready-to-show", () => {
@@ -235,6 +239,19 @@ ipcMain.handle("show-open-dialog", async (event, options) => {
 
 ipcMain.handle("open-settings-dialog", () => {
   createSettingsWindow();
+});
+
+ipcMain.handle("close-window", () => {
+  if (mainWindow) {
+    mainWindow.close();
+  }
+});
+
+// Add event listener for the close button in the renderer
+ipcMain.on("close-window-request", () => {
+  if (mainWindow) {
+    mainWindow.close();
+  }
 });
 
 ipcMain.on("close-settings-dialog", (event) => {

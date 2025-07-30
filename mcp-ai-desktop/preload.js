@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Pass options object to showOpenDialog
   showOpenDialog: (options) => ipcRenderer.invoke("show-open-dialog", options),
   openSettingsDialog: () => ipcRenderer.invoke("open-settings-dialog"),
+  closeWindow: () => ipcRenderer.send("close-window-request"),
   // Expose the new file reading function
   readFileContent: (filePath) => ipcRenderer.invoke("read-file-content", filePath),
   // Image handling

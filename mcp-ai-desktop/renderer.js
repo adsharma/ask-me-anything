@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const addServerBtn = document.getElementById("add-server-btn");
   const serverList = document.getElementById("server-list");
   const settingsBtn = document.getElementById("settings-btn");
+  const closeWindowBtn = document.getElementById("close-window-btn");
 
   // Image upload elements
   const imageBtn = document.getElementById("image-btn");
@@ -965,6 +966,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   settingsOverlay.addEventListener("click", closeSettings);
   settingsCancelBtn.addEventListener("click", closeSettings);
   settingsSaveBtn.addEventListener("click", saveSettings);
+
+  // Window close button event listener
+  if (closeWindowBtn) {
+    closeWindowBtn.addEventListener("click", () => {
+      window.electronAPI.closeWindow();
+    });
+  }
 
   // Handle backend selection change
   if (settingsBackendSelect) {
