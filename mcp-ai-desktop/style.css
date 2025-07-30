@@ -51,6 +51,7 @@ body {
   display: flex;
   flex-grow: 1;
   height: 100%;
+  margin-top: var(--title-bar-height); /* Add margin to account for title bar */
 }
 
 .sidebar {
@@ -61,7 +62,7 @@ body {
   border-right: 1px solid var(--border-color);
   padding: 0;
   box-sizing: border-box;
-  padding-top: var(--title-bar-height);
+  /* Remove padding-top since we're using margin-top on container */
 }
 
 .sidebar-header {
@@ -200,7 +201,7 @@ body {
   display: flex;
   flex-direction: column;
   background-color: var(--chat-bg);
-  padding-top: var(--title-bar-height);
+  /* Remove padding-top since we're using margin-top on container */
 }
 
 .chat-header {
@@ -364,10 +365,15 @@ body {
   background-color: var(--input-bg);
   min-height: var(--input-area-min-height);
   box-sizing: border-box;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 .image-preview-container {
   margin-bottom: 12px;
+  max-width: 100%; /* Ensure it doesn't overflow */
+  overflow: hidden; /* Prevent overflow */
+  position: relative; /* Ensure proper positioning */
+  z-index: 1; /* Keep it below the send button */
 }
 
 .image-preview {
@@ -412,6 +418,8 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 8px;
+  position: relative; /* Ensure proper positioning */
+  z-index: 5; /* Keep it above image preview but below send button if needed */
 }
 
 #image-btn {
@@ -422,12 +430,14 @@ body {
   cursor: pointer;
   width: 44px;
   height: 44px;
+  min-width: 44px; /* Ensure consistent width */
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   transition: background-color 0.2s ease, color 0.2s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 #image-btn:hover {
@@ -467,6 +477,8 @@ body {
   background-color: var(--chat-bg);
   color: var(--text-primary);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  /* Ensure proper sizing behavior */
+  box-sizing: border-box;
 }
 
 #message-input:focus {
@@ -483,12 +495,16 @@ body {
   cursor: pointer;
   width: 44px;
   height: 44px;
+  min-width: 44px; /* Ensure consistent width */
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   transition: background-color 0.2s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0; /* Prevent shrinking */
+  z-index: 10; /* Ensure button stays on top */
+  position: relative; /* Required for z-index to work */
 }
 
 #send-btn:hover {
@@ -499,6 +515,11 @@ body {
   width: 22px;
   height: 22px;
   fill: var(--user-message-text);
+}
+
+/* Ensure send button is always visible and properly positioned */
+#send-btn {
+  visibility: visible !important;
 }
 
 ::-webkit-scrollbar {

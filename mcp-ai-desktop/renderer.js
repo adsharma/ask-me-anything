@@ -319,6 +319,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     imagePreviewContainer.style.display = 'none';
     previewImage.src = '';
     imageInput.value = ''; // Clear the file input
+    // Ensure send button is visible and properly positioned after clearing image
+    sendBtn.style.visibility = 'visible';
+    sendBtn.style.zIndex = '10';
   }
 
   async function handleImageSelection(file) {
@@ -343,6 +346,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const objectUrl = URL.createObjectURL(file);
       previewImage.src = objectUrl;
       imagePreviewContainer.style.display = 'block';
+
+      // Ensure send button remains visible and properly positioned
+      sendBtn.style.visibility = 'visible';
+      sendBtn.style.zIndex = '10';
 
       // Convert to base64 for sending to backend
       const reader = new FileReader();
@@ -644,7 +651,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   sendBtn.addEventListener("click", sendMessage);
   messageInput.addEventListener("keydown", (event) => {
+    // Handle Enter key for sending messages
     if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+
+    // Also handle Ctrl+Enter or Cmd+Enter for sending
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
       sendMessage();
     }
