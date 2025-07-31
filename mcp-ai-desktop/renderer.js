@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const serverList = document.getElementById("server-list");
   const settingsBtn = document.getElementById("settings-btn");
   const closeWindowBtn = document.getElementById("close-window-btn");
+  const clearHistoryBtn = document.getElementById("clear-history-btn"); // Add this line
 
   // Image upload elements
   const imageBtn = document.getElementById("image-btn");
@@ -971,6 +972,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (closeWindowBtn) {
     closeWindowBtn.addEventListener("click", () => {
       window.electronAPI.closeWindow();
+    });
+  }
+
+  // Clear history button event listener
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener("click", async () => {
+      if (!pythonPort) {
+        addMessage("Cannot clear history: Backend not connected.", "system");
+        return;
+      }
+
+      try {
+        const response = await fetch(`http://127.0.0.1:${pythonPort}/clear-history`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.status === "success") {
+          // Clear the chat messages display
+          chatMessages.innerHTML = "";
+          addMessage("Conversation history cleared.", "system");
+          addMessage("Ask me Anything!", "ai");
+        } else {
+          throw new Error(data.message || "Failed to clear history");
+        }
+      } catch (error) {
+        console.error("Error clearing history:", error);
+        addMessage(`Error clearing history: ${error.message}`, "system");
+      }
     });
   }
 

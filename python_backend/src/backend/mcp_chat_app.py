@@ -416,7 +416,7 @@ class MCPChatApp:
             error_msg = f"Error executing tool '{tool_name}': {e}"
             return error_msg, None
 
-    async def process_query(self, query) -> str:
+    async def process_query(self, query, maintain_context: bool = True) -> str:
         """Process a query using the current AI backend."""
         # Handle both string queries and object queries with images
         if isinstance(query, str):
@@ -445,13 +445,13 @@ class MCPChatApp:
                 return await self._process_query_gemini(query_text, image_data)
             else:
                 # For other backends, use LiteLLM
-                return await self._process_query_litellm(query_text, image_data)
+                return await self._process_query_litellm(query_text, image_data, maintain_context)
 
         except Exception as e:
             logger.error(f"Error processing query with {self.ai_backend.get_backend()}: {e}", exc_info=True)
             return f"An error occurred while processing your request: {e}"
 
-    async def _process_query_litellm(self, query: str, image_data=None) -> str:
+    async def _process_query_litellm(self, query: str, image_data=None, maintain_context: bool = True) -> str:
         """Process query using LiteLLM for non-Gemini backends."""
         try:
             # Convert MCP tools to OpenAI function format if available
@@ -465,9 +465,17 @@ class MCPChatApp:
                 tool_descriptions = [f"- {tool.name}: {tool.description or 'No description'}" for tool in self.mcp_tools]
                 system_prompt = f"You have access to the following tools:\n" + "\n".join(tool_descriptions)
 
+            # Add conversation history to the message if maintaining context
+            full_message = query
+            if maintain_context and hasattr(self, '_conversation_history'):
+                # Format conversation history for LiteLLM
+                history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in self._conversation_history])
+                if history_text:
+                    full_message = f"Previous conversation:\n{history_text}\n\nCurrent question: {query}"
+
             # Send request to backend with image support
             response = await self.ai_backend.chat_async(
-                message=query,
+                message=full_message,
                 system_prompt=system_prompt,
                 tools=tools,
                 image_data=image_data
@@ -477,10 +485,24 @@ class MCPChatApp:
             if tools and response.startswith('[') and 'function' in response:
                 try:
                     tool_calls = json.loads(response)
-                    return await self._handle_tool_calls_litellm(tool_calls, query)
+                    result = await self._handle_tool_calls_litellm(tool_calls, query)
+                    # Add to conversation history
+                    if maintain_context:
+                        if not hasattr(self, '_conversation_history'):
+                            self._conversation_history = []
+                        self._conversation_history.append({"role": "user", "content": query})
+                        self._conversation_history.append({"role": "assistant", "content": result})
+                    return result
                 except (json.JSONDecodeError, KeyError):
                     # Not a tool call, return as regular response
                     pass
+
+            # Add to conversation history
+            if maintain_context:
+                if not hasattr(self, '_conversation_history'):
+                    self._conversation_history = []
+                self._conversation_history.append({"role": "user", "content": query})
+                self._conversation_history.append({"role": "assistant", "content": response})
 
             return response
 
@@ -742,3 +764,10 @@ class MCPChatApp:
         for identifier in server_identifiers:
             await self.disconnect_mcp_server(identifier)
         logger.info("MCPChatApp cleanup complete.")
+
+    def clear_conversation_history(self):
+        """Clear the conversation history."""
+        self.chat_history = []  # For Gemini
+        if hasattr(self, '_conversation_history'):
+            self._conversation_history = []  # For other backends
+        logger.info("Conversation history cleared.")

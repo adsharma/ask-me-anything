@@ -107,7 +107,7 @@ async def process_chat_async(message):
     if not app:
         return {"reply": "Error: Backend chat app not initialized."}, 500
     try:
-        reply = await app.process_query(message)
+        reply = await app.process_query(message, maintain_context=True)
         return {"reply": reply}, 200
     except Exception as e:
         logger.error(f"Error processing chat: {e}", exc_info=True)
@@ -210,6 +210,17 @@ async def validate_backend_async():
     except Exception as e:
         logger.error(f"Error validating backend: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to validate backend: {e}"}, 500
+
+async def clear_history_async():
+    app = await initialize_chat_app()
+    if not app:
+        return {"status": "error", "message": "Chat app not initialized"}, 500
+    try:
+        app.clear_conversation_history()
+        return {"status": "success", "message": "Conversation history cleared"}, 200
+    except Exception as e:
+        logger.error(f"Error clearing conversation history: {e}", exc_info=True)
+        return {"status": "error", "message": f"Failed to clear conversation history: {e}"}, 500
 # --- End Backend Management Async Functions ---
 
 @flask_app.route('/chat', methods=['POST'])
@@ -450,6 +461,22 @@ def validate_backend():
     except Exception as e:
         logger.error(f"Error getting result from validate_backend future: {e}", exc_info=True)
         return jsonify({"status": "error", "message": f"Error validating backend: {e}"}), 500
+
+@flask_app.route('/clear-history', methods=['POST'])
+def clear_history():
+    if not loop or not loop.is_running():
+        return jsonify({"status": "error", "message": "Backend loop not running."}), 500
+
+    future = asyncio.run_coroutine_threadsafe(clear_history_async(), loop)
+    try:
+        result, status_code = future.result(timeout=5)
+        return jsonify(result), status_code
+    except asyncio.TimeoutError:
+        logger.error("Clearing conversation history timed out.")
+        return jsonify({"status": "error", "message": "Error: Clearing conversation history timed out."}), 504
+    except Exception as e:
+        logger.error(f"Error getting result from clear_history future: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": f"Error clearing conversation history: {e}"}), 500
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MCP Multi-Backend Flask Server')
     parser.add_argument('--port', type=int, default=5001,
@@ -490,7 +517,7 @@ if __name__ == '__main__':
                         chat_app = MCPChatApp()
                         logger.info("Created MCPChatApp instance with Ollama backend despite initialization failure.")
 
-    else:
+    except:
         logger.error("Asyncio loop not available after waiting.")
         sys.exit(1)
 

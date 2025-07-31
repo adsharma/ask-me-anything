@@ -250,6 +250,7 @@ body {
   width: 100%;
   box-sizing: border-box; /* Include padding in width */
   flex-shrink: 0; /* Prevent shrinking */
+  position: relative;
 }
 
 .chat-header h1 {
@@ -260,16 +261,29 @@ body {
 }
 
 .chat-header .subtitle {
-  margin: 0 0 3px 0;
+  margin: 0 0 15px 0;
   font-size: 0.95em;
   color: var(--text-secondary);
 }
 
-.chat-header .support-note {
-  margin: 0;
-  font-size: 0.8em;
+.clear-history-btn {
+  position: absolute;
+  top: 20px;
+  right: 25px;
+  background-color: var(--sidebar-bg);
   color: var(--text-secondary);
-  font-style: italic;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 6px 12px;
+  font-size: 0.85em;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.clear-history-btn:hover {
+  background-color: #edeae0;
+  color: var(--text-primary);
+  border-color: #c8bfaf;
 }
 
 #chat-messages {
