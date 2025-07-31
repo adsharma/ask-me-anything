@@ -34,14 +34,11 @@ async def initialize_chat_app():
     if chat_app is None:
         chat_app = MCPChatApp()
         try:
-            # Try to initialize with default backend (Gemini)
+            # Try to initialize with default backend (Ollama)
             if chat_app.requires_api_key():
-                api_key = os.getenv("GEMINI_API_KEY")
-                if api_key:
-                    await chat_app.set_api_key_and_reinitialize(api_key)
-                else:
-                    logger.warning("No API key found for default backend, skipping initialization")
-            logger.info("MCPChatApp initialized successfully.")
+                # Ollama doesn't require an API key, so this won't execute
+                pass
+            logger.info("MCPChatApp initialized successfully with Ollama backend.")
         except Exception as e:
             logger.error(
                 f"Failed to initialize MCPChatApp: {e}", exc_info=True)
@@ -466,32 +463,32 @@ if __name__ == '__main__':
         logger.error("Asyncio loop did not start within timeout.")
         sys.exit(1)
 
-    if loop:
-        init_future = asyncio.run_coroutine_threadsafe(
-            initialize_chat_app(), loop)
-        try:
-            init_future.result(timeout=20)
-            if chat_app is None:
-                logger.error("Chat app initialization returned None.")
-                sys.exit(1)
-            logger.info("Chat app initialized successfully via asyncio loop.")
-        except Exception as e:
-            logger.error(
-                f"Error during chat app initialization: {e}", exc_info=True)
-            # Don't exit if init fails due to no key, allow setting it later
-            logger.warning(
-                "Initial backend initialization failed, likely no API key. Backend can be configured later via API.")
-            # Ensure we have a chat_app instance even if init fails
-            if chat_app is None:
-                loop_for_init = asyncio.run_coroutine_threadsafe(
-                    initialize_chat_app(), loop)
-                try:
-                    loop_for_init.result(timeout=5)
-                except:
-                    pass  # Ignore errors, we'll create manually
+    try:
+            init_future = asyncio.run_coroutine_threadsafe(
+                initialize_chat_app(), loop)
+            try:
+                init_future.result(timeout=20)
                 if chat_app is None:
-                    chat_app = MCPChatApp()
-                    logger.info("Created MCPChatApp instance despite initialization failure.")
+                    logger.error("Chat app initialization returned None.")
+                    sys.exit(1)
+                logger.info("Chat app initialized successfully via asyncio loop with Ollama backend.")
+            except Exception as e:
+                logger.error(
+                    f"Error during chat app initialization: {e}", exc_info=True)
+                # Don't exit if init fails due to no key, allow setting it later
+                logger.warning(
+                    "Initial backend initialization failed. Backend can be configured later via API.")
+                # Ensure we have a chat_app instance even if init fails
+                if chat_app is None:
+                    loop_for_init = asyncio.run_coroutine_threadsafe(
+                        initialize_chat_app(), loop)
+                    try:
+                        loop_for_init.result(timeout=5)
+                    except:
+                        pass  # Ignore errors, we'll create manually
+                    if chat_app is None:
+                        chat_app = MCPChatApp()
+                        logger.info("Created MCPChatApp instance with Ollama backend despite initialization failure.")
 
     else:
         logger.error("Asyncio loop not available after waiting.")

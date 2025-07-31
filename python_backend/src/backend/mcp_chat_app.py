@@ -23,7 +23,7 @@ load_dotenv()
 
 
 class MCPChatApp:
-    def __init__(self, backend_type: str = "gemini", model_name: str = None):
+    def __init__(self, backend_type: str = "ollama", model_name: str = None):
         # Initialize the AI backend manager
         self.ai_backend = AIBackendManager()
         if backend_type:

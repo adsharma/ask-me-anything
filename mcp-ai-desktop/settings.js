@@ -125,6 +125,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateUIForBackend(currentBackend);
   } catch (error) {
     console.error("Error loading current backend:", error);
+    // Set default to Ollama if there's an error loading current backend
+    backendSelect.value = 'ollama';
+    updateUIForBackend('ollama');
   }
 
   // Handle backend change

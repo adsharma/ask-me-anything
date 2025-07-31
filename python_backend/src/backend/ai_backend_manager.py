@@ -15,7 +15,7 @@ class AIBackendManager:
     """Manages multiple AI backends using LiteLLM for unified interface."""
 
     def __init__(self):
-        self.current_backend = "gemini"  # default
+        self.current_backend = "ollama"  # default to Ollama for local models
         self.current_model = None
         self.api_key = None
 
@@ -32,7 +32,7 @@ class AIBackendManager:
                 ]
             },
             "ollama": {
-                "default_model": "llama3.1",
+                "default_model": "qwen3:30b",
                 "requires_api_key": False,
                 "base_url": "http://localhost:11434",
                 "models": []  # Will be fetched dynamically

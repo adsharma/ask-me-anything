@@ -38,7 +38,7 @@ const MODEL_HELPERS = {
   }
 };
 
-let currentBackend = BACKEND_TYPES.GEMINI; // Default to Gemini for backward compatibility
+let currentBackend = BACKEND_TYPES.OLLAMA; // Default to Ollama for local models
 
 function createSettingsWindow() {
   if (settingsWindow) {
