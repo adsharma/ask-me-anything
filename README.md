@@ -61,7 +61,7 @@ This repository contains both a Python backend and an Electron-based desktop app
 2. Install the required dependencies:
 
    ```bash
-  p npm install
+   pnpm install
    ```
 
 3. Start the Electron app in development mode:
