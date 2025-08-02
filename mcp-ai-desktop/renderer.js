@@ -10,7 +10,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const serverList = document.getElementById("server-list");
   const settingsBtn = document.getElementById("settings-btn");
   const closeWindowBtn = document.getElementById("close-window-btn");
-  const clearHistoryBtn = document.getElementById("clear-history-btn"); // Add this line
+  const clearHistoryBtn = document.getElementById("clear-history-btn");
+  const toggleDebugBtn = document.getElementById("toggle-debug-btn");
+  const debugPane = document.getElementById("debug-pane");
+  const closeDebugBtn = document.getElementById("close-debug-btn");
+  const debugContent = document.getElementById("debug-content");
 
   // Image upload elements
   const imageBtn = document.getElementById("image-btn");
@@ -651,6 +655,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Debug functionality - show stdout/stderr from Python process
+  let debugOutput = "";
+
+  function updateDebugContent() {
+    debugContent.textContent = debugOutput || "No output from Python process yet.";
+    // Auto-scroll to bottom
+    debugContent.scrollTop = debugContent.scrollHeight;
+  }
+
+  function toggleDebugPane() {
+    if (debugPane.classList.contains("active")) {
+      debugPane.classList.remove("active");
+      toggleDebugBtn.textContent = "Debug";
+    } else {
+      debugPane.classList.add("active");
+      toggleDebugBtn.textContent = "Hide Debug";
+      updateDebugContent();
+    }
+  }
+
+  function closeDebugPane() {
+    debugPane.classList.remove("active");
+    toggleDebugBtn.textContent = "Debug";
+  }
+
+  // Listen for Python backend output
+  window.electronAPI.onPythonBackendOutput((data) => {
+    if (data.type === 'stdout') {
+      debugOutput += `[STDOUT] ${data.data}`;
+    } else if (data.type === 'stderr') {
+      debugOutput += `[STDERR] ${data.data}`;
+    } else if (data.type === 'exit') {
+      debugOutput += `[EXIT] ${data.data}\n`;
+    }
+
+    // Keep only the last 10000 characters to prevent memory issues
+    if (debugOutput.length > 10000) {
+      debugOutput = debugOutput.substring(debugOutput.length - 10000);
+    }
+
+    // Update display if debug pane is open
+    if (debugPane.classList.contains("active")) {
+      updateDebugContent();
+    }
+  });
+
   sendBtn.addEventListener("click", sendMessage);
   messageInput.addEventListener("keydown", (event) => {
     // Handle Enter key for sending messages
@@ -971,6 +1021,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Window close button event listener
   if (closeWindowBtn) {
     closeWindowBtn.addEventListener("click", () => {
+      // Clear debug refresh interval if it exists
+      // Is this needed? Uncommenting causes problems with closeWindow
+      // if (debugRefreshInterval) {
+      //   clearInterval(debugRefreshInterval);
+      //   debugRefreshInterval = null;
+      // }
       window.electronAPI.closeWindow();
     });
   }
@@ -1036,6 +1092,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       closeSettings();
     }
   });
+
+  // Debug pane event listeners
+  toggleDebugBtn.addEventListener("click", toggleDebugPane);
+  closeDebugBtn.addEventListener("click", closeDebugPane);
 
   initializeApp();
 });

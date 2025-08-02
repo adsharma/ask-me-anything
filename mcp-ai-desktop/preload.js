@@ -24,4 +24,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("api-key-update-status", (event, ...args) =>
       callback(...args)
     ),
+  // Debug pane functions
+  onPythonBackendOutput: (callback) =>
+    ipcRenderer.on("python-backend-output", (event, ...args) =>
+      callback(...args)
+    ),
 });

@@ -3,9 +3,11 @@ const {app, BrowserWindow, ipcMain, dialog} = require("electron");
 const path = require("path");
 const fs = require("fs").promises; // Import fs promises
 const fetch = require("node-fetch");
+const { spawn } = require('child_process');
 
 let mainWindow;
 let settingsWindow = null;
+let pythonProcess = null;
 const pythonPort = 5001;
 
 // Backend configuration using LiteLLM providers
@@ -146,7 +148,35 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  console.log("[app.whenReady] App ready. Calling createWindow...");
+  console.log("[app.whenReady] App ready. Starting Python backend and creating window...");
+
+  // Start Python backend with uv
+  const pythonBackendPath = path.join(__dirname, '..', 'python_backend', 'src', 'backend', 'mcp_flask_backend.py');
+  pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], {
+    cwd: path.join(__dirname, '..', 'python_backend')
+  });
+
+  pythonProcess.stdout.on('data', (data) => {
+    console.log(`[Python Backend] ${data}`);
+    if (mainWindow) {
+      mainWindow.webContents.send('python-backend-output', { type: 'stdout', data: data.toString() });
+    }
+  });
+
+  pythonProcess.stderr.on('data', (data) => {
+    console.error(`[Python Backend Error] ${data}`);
+    if (mainWindow) {
+      mainWindow.webContents.send('python-backend-output', { type: 'stderr', data: data.toString() });
+    }
+  });
+
+  pythonProcess.on('close', (code) => {
+    console.log(`[Python Backend] Process exited with code ${code}`);
+    if (mainWindow) {
+      mainWindow.webContents.send('python-backend-output', { type: 'exit', data: `Process exited with code ${code}` });
+    }
+  });
+
   createWindow();
 
   app.on("activate", () => {
@@ -164,6 +194,10 @@ app.on("window-all-closed", () => {
 
 app.on("quit", () => {
   console.log("[app.quit] App quitting.");
+  // Kill Python process if it's still running
+  if (pythonProcess) {
+    pythonProcess.kill();
+  }
 });
 
 ipcMain.handle("get-python-port", async () => {
@@ -251,6 +285,10 @@ ipcMain.handle("close-window", () => {
 ipcMain.on("close-window-request", () => {
   if (mainWindow) {
     mainWindow.close();
+  }
+  // Ensure app quits when main window is closed on non-macOS platforms
+  if (process.platform !== "darwin") {
+    app.quit();
   }
 });
 
