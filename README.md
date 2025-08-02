@@ -14,20 +14,9 @@ Chat with any LLM using any framework on major platforms. Use MCP for tools.
 
 ## Screenshots
 
-<p align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/demo_images/C9zdjSLfhAfEswt.png" width="80%" alt="Weather Tool Example">
-  <br><em>Example of the weather tool in action</em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/demo_images/BEvT6bS7bFJVVKK.png" width="80%" alt="Chat Interface">
-  <br><em>Main chat interface with LLM</em>
-</p>
-
-<p align="center">
-  <img src="https://github.com/kkrishnan90/gemini-desktop/blob/main/mcp-gemini-desktop/demo_images/KdLPsRCxjbJB9ph.png" width="80%" alt="Calculator Tool Example">
-  <br><em>Using the calculator tool with Gemini</em>
-</p>
+Startup ![Startup](mcp-ai-desktop/demo_images/startup.png)
+Tool Use ![Tool Use](mcp-ai-desktop/demo_images/tool-use.png)
+Model Config ![Model Config](mcp-ai-desktop/demo_images/model-config.png)
 
 ## Overview
 

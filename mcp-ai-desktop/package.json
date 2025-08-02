@@ -61,6 +61,7 @@
   "dependencies": {
     "katex": "^0.16.11",
     "marked": "^13.0.2",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "pnpm": "^10.13.1"
   }
 }
