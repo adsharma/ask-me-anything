@@ -1,15 +1,10 @@
-<div align="center">
+# Ask Me Anything
 
-  <h1>Ask Me Anything</h1>
-
-  <p>
-    Ask me anything app is a cross-platform desktop application that creates a seamless chat interface for AI models with extensible capabilities through a Model Context Protocol (MCP) framework. It is a fork of a previous project that was <a href="https://github.com/kkrishnan90/gemini-desktop/">Gemini specific</a>
-  </p>
-</div>
+Chat with any LLM using any framework on major platforms. Use MCP for tools.
 
 ## ✨ Features
 
-- **🤖 Multiple LLM Integration:** Seamless chat interface with Ollama, MLX, Google/OpenAI/Anthropic (configurable via Settings).
+- **🤖 LLM Framework Integration:** Seamless chat interface with Ollama, MLX, Google/OpenAI/Anthropic (configurable via Settings).
 - **🔧 Extensible Tools (MCP):** Connect external tools and data sources via the Model Context Protocol.
   - Supports Python-based MCP servers (added via file path).
   - Supports command-based MCP servers (e.g., Node.js) defined in a JSON configuration file.
@@ -52,41 +47,11 @@ This repository contains both a Python backend and an Electron-based desktop app
 
 ### Setup
 
-1. Navigate to the Python backend directory:
-
-   ```bash
-   cd python_backend
-   ```
-
-2. Install uv if you don't have it already:
+1. Install uv if you don't have it already:
 
    ```bash
    pip install uv
    ```
-
-3. Install the required dependencies using uv:
-
-   ```bash
-   uv pip install .
-   ```
-
-4. Set your Google API key as an environment variable:
-
-   ```bash
-   # For Linux/macOS
-   export GOOGLE_API_KEY=your_api_key_here
-
-   # For Windows
-   set GOOGLE_API_KEY=your_api_key_here
-   ```
-
-5. Start the Python backend server:
-
-   ```bash
-   python main.py
-   ```
-
-   The server should start running on `http://localhost:5000`
 
 ## Running the Frontend Electron App
 
@@ -94,6 +59,7 @@ This repository contains both a Python backend and an Electron-based desktop app
 
 - Node.js (v16+)
 - npm (Node package manager)
+- pnpm (Parallel npm - recommended, but not necessary)
 
 ### Setup
 
@@ -106,12 +72,12 @@ This repository contains both a Python backend and an Electron-based desktop app
 2. Install the required dependencies:
 
    ```bash
-   npm install
+  p npm install
    ```
 
 3. Start the Electron app in development mode:
    ```bash
-   npm start
+   pnpm start
    ```
 
 ### Building the App
@@ -147,13 +113,16 @@ The repository includes example server implementations in `mcp-ai-desktop/mcp_ex
 
 ## Troubleshooting
 
-- Ensure the Python backend is running before starting the Electron app
-- Check that your Google API key is correctly set
+- Ensure uv is installed. Otherwise the backend won't start
 - Verify that the required ports are not blocked by a firewall
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Credits
+
+Original version was [Gemini specific](https://github.com/kkrishnan90/gemini-desktop)
 
 ## Contributing
 
