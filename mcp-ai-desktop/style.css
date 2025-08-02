@@ -1,7 +1,7 @@
 /* style.css */
 :root {
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  --font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Ubuntu, Helvetica, Arial, sans-serif;
   --sidebar-bg: #f4f1e7; /* Warm beige/tan */
   --chat-bg: #fdfcf7; /* Very light warm cream */
   --input-bg: #f4f1e7; /* Warm beige/tan */
@@ -21,7 +21,7 @@
   --status-error: #b9615c; /* Muted red */
   --title-bar-height: 38px;
   --sidebar-width: 260px;
-  --input-area-min-height: 75px;
+  --input-area-min-height: 100px;
 }
 
 body {
@@ -592,6 +592,7 @@ body {
   border-radius: 10px;
   resize: none;
   font-size: 1em;
+  font-family: var(--font-family);
   line-height: 1.5;
   min-height: 27px;
   max-height: 150px;
