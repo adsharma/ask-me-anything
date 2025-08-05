@@ -93,6 +93,26 @@ If you prefer to use pre-built binaries directly:
 - macOS (Apple Silicon): `MCP AI Chat-0.1.0-arm64.dmg`
 - Windows: Check the `dist` folder for `.exe` files
 
+## Searxng Server
+
+This is the default configured websearch server suitable for use by a small model.
+
+```
+docker run --name searxng -d \
+    -p 8888:8080 \
+    -v "./config/:/etc/searxng/" \
+    -v "./data/:/var/cache/searxng/" \
+    docker.io/searxng/searxng:latest
+```
+
+Remember to edit `config/settings.yaml` to enable json output. Look for a section like this:
+
+```
+  formats:
+    - html
+    - json
+```
+
 ## Example Servers
 
 The repository includes example server implementations in `mcp-ai-desktop/mcp_example_servers/`:
