@@ -160,7 +160,9 @@ app.whenReady().then(() => {
     // On Windows, ensure child processes are properly tracked
     detached: false,
     // On Windows, this helps with process group management
-    shell: process.platform === 'win32'
+    shell: process.platform === 'win32',
+    // Store PID for better cleanup
+    stdio: ['ignore', 'pipe', 'pipe']
   };
 
   pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], spawnOptions);
@@ -184,6 +186,12 @@ app.whenReady().then(() => {
     if (mainWindow) {
       mainWindow.webContents.send('python-backend-output', { type: 'exit', data: `Process exited with code ${code}` });
     }
+    // Mark process as null when it actually exits
+    pythonProcess = null;
+  });
+
+  pythonProcess.on('exit', (code, signal) => {
+    console.log(`[Python Backend] Process exit event - code: ${code}, signal: ${signal}`);
   });
 
   createWindow();
@@ -196,6 +204,28 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  console.log("[app.window-all-closed] All windows closed.");
+
+  // Ensure Python process cleanup happens here too
+  if (pythonProcess && !pythonProcess.killed) {
+    console.log("[app.window-all-closed] Cleaning up Python process...");
+    if (process.platform === 'win32') {
+      try {
+        const { spawnSync } = require('child_process');
+        const cleanupResult = spawnSync('taskkill', ['/pid', pythonProcess.pid, '/t', '/f'], {
+          windowsHide: true,
+          timeout: 3000
+        });
+        console.log(`[app.window-all-closed] Windows cleanup completed with code: ${cleanupResult.status}`);
+      } catch (error) {
+        console.error("[app.window-all-closed] Error in Windows cleanup:", error);
+        pythonProcess.kill('SIGTERM');
+      }
+    } else {
+      pythonProcess.kill('SIGTERM');
+    }
+  }
+
   if (process.platform !== "darwin") {
     app.quit();
   }
@@ -205,10 +235,32 @@ app.on("window-all-closed", () => {
 app.on("before-quit", async (event) => {
   console.log("[app.before-quit] App is about to quit, cleaning up...");
 
-  // If already quitting, don't prevent the quit
+  // If already quitting, don't prevent the quit but still try to kill the process
   if (isQuitting) {
-    console.log("[app.before-quit] Already in cleanup process, allowing quit...");
-    return;
+    console.log("[app.before-quit] Already in cleanup process, but ensuring Python process is killed...");
+
+    // Still try to kill the Python process if it's running
+    if (pythonProcess && !pythonProcess.killed) {
+      console.log("[app.before-quit] Python process still running, force killing...");
+      if (process.platform === 'win32') {
+        try {
+          const { spawnSync } = require('child_process');
+          const killResult = spawnSync('taskkill', ['/pid', pythonProcess.pid, '/t', '/f'], {
+            windowsHide: true,
+            timeout: 2000
+          });
+          console.log(`[app.before-quit] Emergency taskkill result: ${killResult.status}`);
+        } catch (error) {
+          console.error("[app.before-quit] Emergency taskkill failed:", error);
+        }
+      }
+      try {
+        pythonProcess.kill('SIGKILL');
+      } catch (e) {
+        console.log("[app.before-quit] Emergency SIGKILL failed:", e.message);
+      }
+    }
+    return; // Allow the quit to proceed
   }
 
   // Prevent immediate quit to allow cleanup
@@ -219,18 +271,26 @@ app.on("before-quit", async (event) => {
   try {
     if (pythonPort) {
       console.log("[app.before-quit] Requesting Python backend to disconnect all MCP servers...");
-      const response = await fetch(`http://127.0.0.1:${pythonPort}/disconnect-all-servers`, {
+
+      // Create a timeout promise to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 3000); // 3 second timeout
+      });
+
+      const fetchPromise = fetch(`http://127.0.0.1:${pythonPort}/disconnect-all-servers`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
       });
 
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
       if (response.ok) {
         const result = await response.json().catch(() => ({ message: "No response body" }));
         console.log("[app.before-quit] All MCP servers disconnected successfully:", result);
-        // Give a moment for processes to clean up
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Brief pause to allow response to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
       } else {
         const errorData = await response.json().catch(() => ({ message: "No error details" }));
         console.warn(`[app.before-quit] Failed to disconnect MCP servers - Status: ${response.status}, Error:`, errorData);
@@ -238,27 +298,124 @@ app.on("before-quit", async (event) => {
     }
   } catch (error) {
     console.error("[app.before-quit] Error disconnecting MCP servers:", error);
+    // Continue with process cleanup immediately
   }
 
   // Kill Python process if it's still running
   if (pythonProcess) {
     console.log("[app.before-quit] Terminating Python process...");
-    pythonProcess.kill('SIGTERM');
+    console.log(`[app.before-quit] Python process PID: ${pythonProcess.pid}, killed status: ${pythonProcess.killed}`);
 
-    // Give it a moment to terminate gracefully
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // On Windows, we need to kill the entire process tree
+    if (process.platform === 'win32') {
+      try {
+        // Use taskkill to terminate the process tree on Windows - wait for completion
+        const { spawnSync } = require('child_process');
+        console.log("[app.before-quit] Using taskkill to terminate process tree...");
+        const killResult = spawnSync('taskkill', ['/pid', pythonProcess.pid, '/t', '/f'], {
+          windowsHide: true,
+          timeout: 3000, // Reduced timeout
+          encoding: 'utf8'
+        });
 
-    // Force kill if still running
+        console.log(`[app.before-quit] Taskkill completed with exit code: ${killResult.status}`);
+        if (killResult.error) {
+          console.error("[app.before-quit] Taskkill error:", killResult.error);
+        }
+        if (killResult.stderr && killResult.stderr.trim()) {
+          console.error("[app.before-quit] Taskkill stderr:", killResult.stderr.trim());
+        }
+        if (killResult.stdout && killResult.stdout.trim()) {
+          console.log("[app.before-quit] Taskkill stdout:", killResult.stdout.trim());
+        }
+
+        // If taskkill failed, try alternative approaches
+        if (killResult.status !== 0) {
+          console.log("[app.before-quit] Taskkill failed, trying alternative kill methods...");
+
+          // Try killing individual processes by name
+          const killPythonResult = spawnSync('taskkill', ['/f', '/im', 'python.exe'], {
+            windowsHide: true,
+            timeout: 2000,
+            encoding: 'utf8'
+          });
+          console.log(`[app.before-quit] Kill python.exe result: ${killPythonResult.status}`);
+
+          const killUvResult = spawnSync('taskkill', ['/f', '/im', 'uv.exe'], {
+            windowsHide: true,
+            timeout: 2000,
+            encoding: 'utf8'
+          });
+          console.log(`[app.before-quit] Kill uv.exe result: ${killUvResult.status}`);
+        }
+
+        // Also send SIGTERM to the main process as backup
+        try {
+          pythonProcess.kill('SIGTERM');
+          console.log("[app.before-quit] Sent SIGTERM to Python process");
+        } catch (e) {
+          console.log("[app.before-quit] SIGTERM failed (process may already be dead):", e.message);
+        }
+      } catch (error) {
+        console.error("[app.before-quit] Error killing Windows process tree:", error);
+        // Fallback to basic kill
+        try {
+          pythonProcess.kill('SIGTERM');
+        } catch (e) {
+          console.error("[app.before-quit] Fallback SIGTERM also failed:", e.message);
+        }
+      }
+    } else {
+      // On Unix-like systems, use SIGTERM
+      pythonProcess.kill('SIGTERM');
+    }
+
+    // Brief wait to let the kill take effect
+    console.log("[app.before-quit] Waiting briefly for process termination...");
+    await new Promise(resolve => setTimeout(resolve, 100)); // Reduced wait time
+
+    // Check if process is still running and force kill if needed
     if (pythonProcess && !pythonProcess.killed) {
-      console.log("[app.before-quit] Force killing Python process...");
-      pythonProcess.kill('SIGKILL');
+      console.log("[app.before-quit] Process still running, force killing...");
+      console.log(`[app.before-quit] Process PID: ${pythonProcess.pid}`);
+      if (process.platform === 'win32') {
+        try {
+          const { spawnSync } = require('child_process');
+          console.log("[app.before-quit] Using taskkill for force kill...");
+          const forceKillResult = spawnSync('taskkill', ['/pid', pythonProcess.pid, '/t', '/f'], {
+            windowsHide: true,
+            timeout: 2000,
+            encoding: 'utf8'
+          });
+          console.log(`[app.before-quit] Force kill completed with exit code: ${forceKillResult.status}`);
+
+          // Also try killing by name as final resort
+          if (forceKillResult.status !== 0) {
+            console.log("[app.before-quit] Final resort: killing all python/uv processes...");
+            spawnSync('taskkill', ['/f', '/im', 'python.exe'], { windowsHide: true, timeout: 1000 });
+            spawnSync('taskkill', ['/f', '/im', 'uv.exe'], { windowsHide: true, timeout: 1000 });
+          }
+        } catch (error) {
+          console.error("[app.before-quit] Error force killing Windows process:", error);
+        }
+      }
+
+      // Final attempt with SIGKILL
+      try {
+        pythonProcess.kill('SIGKILL');
+        console.log("[app.before-quit] Sent SIGKILL to Python process");
+      } catch (e) {
+        console.log("[app.before-quit] SIGKILL failed:", e.message);
+      }
+    } else {
+      console.log("[app.before-quit] Python process terminated successfully");
     }
   }
 
   // Now actually quit - this will trigger quit event but not before-quit again
   setTimeout(() => {
     app.quit();
-  }, 100);
+  }, 50);
 });
 
 app.on("quit", () => {
@@ -267,7 +424,20 @@ app.on("quit", () => {
   // Final safety check - kill Python process if somehow still running
   if (pythonProcess && !pythonProcess.killed) {
     console.log("[app.quit] Force killing any remaining Python process...");
-    pythonProcess.kill('SIGKILL');
+    if (process.platform === 'win32') {
+      try {
+        const { spawnSync } = require('child_process');
+        const finalKillResult = spawnSync('taskkill', ['/pid', pythonProcess.pid, '/t', '/f'], {
+          windowsHide: true,
+          timeout: 3000
+        });
+        console.log(`[app.quit] Final Windows process kill completed with code: ${finalKillResult.status}`);
+      } catch (error) {
+        console.error("[app.quit] Error in final Windows process kill:", error);
+      }
+    } else {
+      pythonProcess.kill('SIGKILL');
+    }
   }
 });
 
@@ -573,4 +743,33 @@ ipcMain.handle("save-api-key", async (event, apiKey, model, backend) => {
     console.error("[save-api-key] Error saving settings:", error);
     return {success: false, message: error.message};
   }
+});
+
+// Handle process exit events for thorough cleanup
+process.on('exit', () => {
+  console.log("[process.exit] Node.js process exiting, final cleanup...");
+  if (pythonProcess && !pythonProcess.killed) {
+    console.log("[process.exit] Force terminating Python process...");
+    try {
+      pythonProcess.kill('SIGKILL');
+    } catch (error) {
+      console.error("[process.exit] Error in final process kill:", error);
+    }
+  }
+});
+
+process.on('SIGINT', () => {
+  console.log("[process.SIGINT] Received SIGINT, cleaning up...");
+  if (pythonProcess && !pythonProcess.killed) {
+    pythonProcess.kill('SIGTERM');
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log("[process.SIGTERM] Received SIGTERM, cleaning up...");
+  if (pythonProcess && !pythonProcess.killed) {
+    pythonProcess.kill('SIGTERM');
+  }
+  process.exit(0);
 });
