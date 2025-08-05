@@ -7,8 +7,10 @@ from flask import Flask, request, jsonify
 import asyncio
 import threading
 import logging
+import json
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).parent.absolute()))
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -47,7 +49,70 @@ async def initialize_chat_app():
     return chat_app
 
 
-async def add_server_async(path=None, name=None, command=None, args=None):
+async def load_default_servers():
+    """Load servers from mcp_servers.json configuration file"""
+    global chat_app
+    app = await initialize_chat_app()
+    if not app:
+        logger.error("Cannot load default servers: Chat app not initialized")
+        return
+
+    # Look for mcp_servers.json in the python_backend directory
+    config_path = Path(__file__).parent.parent.parent / 'mcp_servers.json'
+
+    if not config_path.exists():
+        logger.info(f"No default server configuration found at {config_path}")
+        return
+
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        if not config or 'mcpServers' not in config:
+            logger.warning("Invalid configuration format in mcp_servers.json")
+            return
+
+        servers = config['mcpServers']
+        loaded_count = 0
+
+        for server_name, server_config in servers.items():
+            # Skip disabled servers
+            if server_config.get('disabled', False):
+                logger.info(f"Skipping disabled server: {server_name}")
+                continue
+
+            if not server_config.get('command') or not server_config.get('args'):
+                logger.warning(f"Invalid server config for {server_name}: missing command or args")
+                continue
+
+            try:
+                # Get environment variables if specified
+                env_vars = server_config.get('env', {})
+                if env_vars:
+                    logger.info(f"Passing environment variables to server {server_name}: {list(env_vars.keys())}")
+
+                added_tools = await app.connect_to_mcp_server(
+                    name=server_name,
+                    command=server_config['command'],
+                    args=server_config['args'],
+                    env=env_vars
+                )
+                logger.info(f"Successfully loaded default server '{server_name}' with {len(added_tools)} tools")
+                loaded_count += 1
+
+            except Exception as e:
+                logger.error(f"Failed to load default server '{server_name}': {e}")
+
+        if loaded_count > 0:
+            logger.info(f"Successfully loaded {loaded_count} default MCP servers")
+        else:
+            logger.info("No default servers were loaded")
+
+    except Exception as e:
+        logger.error(f"Error loading default servers from {config_path}: {e}", exc_info=True)
+
+
+async def add_server_async(path=None, name=None, command=None, args=None, env=None):
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -57,8 +122,8 @@ async def add_server_async(path=None, name=None, command=None, args=None):
          return {"status": "error", "message": "Missing server identifier (path or name)"}, 400
 
     try:
-        added_tools = await app.connect_to_mcp_server(path=path, name=name, command=command, args=args)
-        server_display_name = os.path.basename(path) if path else name
+        added_tools = await app.connect_to_mcp_server(path=path, name=name, command=command, args=args, env=env)
+        server_display_name = Path(path).name if path else name
         return {"status": "success", "message": f"Server '{server_display_name}' added.", "tools": added_tools}, 200
     except FileNotFoundError as e:
         return {"status": "error", "message": str(e)}, 404
@@ -75,7 +140,7 @@ async def disconnect_server_async(identifier):
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
         disconnected = await app.disconnect_mcp_server(identifier)
-        server_display_name = os.path.basename(identifier) if '/' in identifier or '\\' in identifier else identifier
+        server_display_name = Path(identifier).name if '/' in identifier or '\\' in identifier else identifier
         if disconnected:
             return {"status": "success", "message": f"Server '{server_display_name}' disconnected."}, 200
         else:
@@ -85,6 +150,50 @@ async def disconnect_server_async(identifier):
         return {"status": "error", "message": f"Failed to disconnect server: {e}"}, 500
 
 
+async def disconnect_all_servers_async():
+    """Disconnect all connected MCP servers using comprehensive cleanup"""
+    logger.info("Starting disconnect_all_servers_async")
+
+    app = await initialize_chat_app()
+    if not app:
+        logger.error("Chat app not initialized in disconnect_all_servers_async")
+        return {"status": "error", "message": "Chat app not initialized"}, 500
+
+    try:
+        # Get list of all connected servers before cleanup
+        servers = list(app.server_resources.keys())
+        logger.info(f"Found {len(servers)} servers to cleanup: {servers}")
+
+        if not servers:
+            logger.info("No servers to disconnect")
+            return {"status": "success", "message": "No servers to disconnect"}, 200
+
+        logger.info(f"Cleaning up {len(servers)} MCP servers: {servers}")
+
+        # Use the comprehensive cleanup method
+        logger.info("Calling app.cleanup_all_servers()")
+        cleanup_success = await app.cleanup_all_servers()
+        logger.info(f"cleanup_all_servers() returned: {cleanup_success}")
+
+        if cleanup_success:
+            logger.info(f"Successfully cleaned up {len(servers)} servers")
+            return {
+                "status": "success",
+                "message": f"Successfully cleaned up {len(servers)} servers",
+                "servers_cleaned": [Path(s).name if '/' in s or '\\' in s else s for s in servers]
+            }, 200
+        else:
+            logger.warning("cleanup_all_servers() returned False - some errors occurred")
+            return {
+                "status": "error",
+                "message": "Cleanup completed with some errors - check logs"
+            }, 500
+
+    except Exception as e:
+        logger.error(f"Error in disconnect_all_servers_async: {e}", exc_info=True)
+        return {"status": "error", "message": f"Failed to disconnect all servers: {e}"}, 500
+
+
 async def get_servers_async():
     app = await initialize_chat_app()
     if not app:
@@ -92,7 +201,7 @@ async def get_servers_async():
     servers = []
     # Now iterating through identifiers (path or name)
     for identifier, resources in app.server_resources.items():
-        server_display_name = os.path.basename(identifier) if '/' in identifier or '\\' in identifier else identifier
+        server_display_name = Path(identifier).name if '/' in identifier or '\\' in identifier else identifier
         servers.append({
             "identifier": identifier, # Send the unique ID
             "display_name": server_display_name, # Send a user-friendly name
@@ -253,17 +362,18 @@ def add_server():
     name = data.get('name')
     command = data.get('command')
     args = data.get('args') # Expecting a list
+    env = data.get('env', {}) # Expecting a dict
 
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
 
     if path:
         # Adding via Python script path
-        future = asyncio.run_coroutine_threadsafe(add_server_async(path=path), loop)
+        future = asyncio.run_coroutine_threadsafe(add_server_async(path=path, env=env), loop)
         identifier_log = path
     elif name and command and isinstance(args, list):
         # Adding via command/args (e.g., from JSON)
-        future = asyncio.run_coroutine_threadsafe(add_server_async(name=name, command=command, args=args), loop)
+        future = asyncio.run_coroutine_threadsafe(add_server_async(name=name, command=command, args=args, env=env), loop)
         identifier_log = name
     else:
         return jsonify({"status": "error", "message": "Invalid parameters. Provide either 'path' or 'name', 'command', and 'args'."}), 400
@@ -319,6 +429,29 @@ def get_servers():
         logger.error(
             f"Error getting result from get_servers future: {e}", exc_info=True)
         return jsonify({"status": "error", "message": f"Error getting servers: {e}"}), 500
+
+
+@flask_app.route('/disconnect-all-servers', methods=['POST'])
+def disconnect_all_servers():
+    """Disconnect all MCP servers for clean shutdown"""
+    logger.info("Received request to disconnect all servers")
+
+    if not loop or not loop.is_running():
+        logger.error("Backend loop not running when disconnect-all-servers called")
+        return jsonify({"status": "error", "message": "Backend loop not running."}), 500
+
+    logger.info("Submitting disconnect_all_servers_async to event loop")
+    future = asyncio.run_coroutine_threadsafe(disconnect_all_servers_async(), loop)
+    try:
+        result, status_code = future.result(timeout=30)  # Longer timeout for multiple disconnections
+        logger.info(f"disconnect_all_servers_async completed with status {status_code}: {result}")
+        return jsonify(result), status_code
+    except asyncio.TimeoutError:
+        logger.error("Disconnecting all servers timed out.")
+        return jsonify({"status": "error", "message": "Error: Disconnecting all servers timed out."}), 504
+    except Exception as e:
+        logger.error(f"Error disconnecting all servers: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": f"Error disconnecting all servers: {e}"}), 500
 
 
 @flask_app.route('/set-api-key', methods=['POST'])
@@ -499,6 +632,17 @@ if __name__ == '__main__':
                     logger.error("Chat app initialization returned None.")
                     sys.exit(1)
                 logger.info("Chat app initialized successfully via asyncio loop with Ollama backend.")
+
+                # Load default servers from mcp_servers.json BEFORE starting Flask
+                load_servers_future = asyncio.run_coroutine_threadsafe(
+                    load_default_servers(), loop)
+                try:
+                    load_servers_future.result(timeout=30)
+                    logger.info("Default servers loading completed.")
+                except Exception as e:
+                    logger.error(f"Error loading default servers: {e}", exc_info=True)
+                    # Don't exit - the app can still work without default servers
+
             except Exception as e:
                 logger.error(
                     f"Error during chat app initialization: {e}", exc_info=True)

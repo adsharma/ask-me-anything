@@ -160,7 +160,7 @@ class MCPChatApp:
                                 f"Error during periodic status check gather (index {i}, result: {result}) - identifier mapping failed", exc_info=result)
             logger.debug("Periodic server status check finished.")
 
-    async def connect_to_mcp_server(self, path: Optional[str] = None, name: Optional[str] = None, command: Optional[str] = None, args: Optional[List[str]] = None) -> List[str]:
+    async def connect_to_mcp_server(self, path: Optional[str] = None, name: Optional[str] = None, command: Optional[str] = None, args: Optional[List[str]] = None, env: Optional[Dict[str, str]] = None) -> List[str]:
         identifier = path if path else name
         if not identifier:
             raise ValueError("Either 'path' or 'name' must be provided.")
@@ -190,7 +190,7 @@ class MCPChatApp:
         server_params = StdioServerParameters(
             command=command_list[0],
             args=command_list[1:],
-            env=None # Consider allowing env vars later if needed
+            env=env # Pass the environment variables to the subprocess
         )
 
         server_stack = AsyncExitStack()
@@ -277,6 +277,36 @@ class MCPChatApp:
 
         logger.info(f"Successfully disconnected server: {identifier}")
         return True
+
+    async def cleanup_all_servers(self) -> bool:
+        """Cleanup all connected MCP servers for graceful shutdown"""
+        try:
+            server_ids = list(self.server_resources.keys())
+            if not server_ids:
+                logger.info("No MCP servers to cleanup")
+                return True
+
+            logger.info(f"Cleaning up {len(server_ids)} MCP servers...")
+
+            # Disconnect all servers
+            for identifier in server_ids:
+                try:
+                    await self.disconnect_mcp_server(identifier)
+                except Exception as e:
+                    logger.error(f"Error disconnecting server {identifier} during cleanup: {e}")
+
+            # Clear all remaining state
+            self.mcp_tools.clear()
+            self.tool_to_session.clear()
+            self.server_resources.clear()
+            self.gemini_tools_dirty = True
+
+            logger.info("All MCP servers cleaned up successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error during cleanup_all_servers: {e}", exc_info=True)
+            return False
 
     def get_gemini_tool_declarations(self) -> List[genai_types.FunctionDeclaration]:
         if not self.gemini_tools_dirty and self.cached_gemini_declarations is not None:
@@ -396,15 +426,41 @@ class MCPChatApp:
         try:
             logger.info(f"Executing MCP tool '{tool_name}' with args: {args}")
             response = await session.call_tool(tool_name, args)
-            logger.info(f"MCP tool '{tool_name}' executed successfully.")
+
+            # Extract content and check for errors
+            result_content = ""
+            if response.content is not None:
+                if isinstance(response.content, list):
+                    # Handle list of content items (e.g., TextContent objects)
+                    content_texts = []
+                    for item in response.content:
+                        if hasattr(item, 'text'):
+                            content_texts.append(str(item.text))
+                        else:
+                            content_texts.append(str(item))
+                    result_content = '\n'.join(content_texts)
+                else:
+                    result_content = str(response.content)
+
+            # Check if the response indicates an error
+            is_error = getattr(response, 'isError', False)
+            if is_error or (result_content and any(error_phrase in result_content.lower() for error_phrase in
+                           ['failed with error:', 'error:', 'exception:', 'connection failed', 'timeout', 'not found'])):
+                logger.warning(f"MCP tool '{tool_name}' returned error response: {result_content}")
+                error_msg = f"Tool execution failed: {result_content}"
+                if server_identifier:
+                    self.server_resources[server_identifier]['status'] = 'error'
+                return error_msg, None
+
+            logger.info(f"MCP tool '{tool_name}' executed successfully. Content: {result_content[:200]}...")
+
             # Check if server recovered after successful call
             if self.server_resources[server_identifier]['status'] == 'error':
                  server_display_name = os.path.basename(server_identifier) if '/' in server_identifier or '\\' in server_identifier else server_identifier
                  logger.info(
                     f"Server '{server_display_name}' recovered, setting status to 'connected'.")
                  self.server_resources[server_identifier]['status'] = 'connected'
-            # Assuming response.content is the string result or similar primitive
-            result_content = str(response.content) if response.content is not None else ""
+
             # Return "Success" status and the actual content
             return "Success", result_content
         except Exception as e:

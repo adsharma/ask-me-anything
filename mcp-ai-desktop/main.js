@@ -9,6 +9,7 @@ let mainWindow;
 let settingsWindow = null;
 let pythonProcess = null;
 const pythonPort = 5001;
+let isQuitting = false; // Flag to prevent cleanup loop
 
 // Backend configuration using LiteLLM providers
 const BACKEND_TYPES = {
@@ -152,9 +153,17 @@ app.whenReady().then(() => {
 
   // Start Python backend with uv
   const pythonBackendPath = path.join(__dirname, '..', 'python_backend', 'src', 'backend', 'mcp_flask_backend.py');
-  pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], {
-    cwd: path.join(__dirname, '..', 'python_backend')
-  });
+
+  // Configure spawn options for better process management
+  const spawnOptions = {
+    cwd: path.join(__dirname, '..', 'python_backend'),
+    // On Windows, ensure child processes are properly tracked
+    detached: false,
+    // On Windows, this helps with process group management
+    shell: process.platform === 'win32'
+  };
+
+  pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], spawnOptions);
 
   pythonProcess.stdout.on('data', (data) => {
     console.log(`[Python Backend] ${data}`);
@@ -192,11 +201,73 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("quit", () => {
-  console.log("[app.quit] App quitting.");
+// Add before-quit handler for better cleanup
+app.on("before-quit", async (event) => {
+  console.log("[app.before-quit] App is about to quit, cleaning up...");
+
+  // If already quitting, don't prevent the quit
+  if (isQuitting) {
+    console.log("[app.before-quit] Already in cleanup process, allowing quit...");
+    return;
+  }
+
+  // Prevent immediate quit to allow cleanup
+  event.preventDefault();
+  isQuitting = true; // Set flag to prevent re-entry
+
+  // Perform cleanup
+  try {
+    if (pythonPort) {
+      console.log("[app.before-quit] Requesting Python backend to disconnect all MCP servers...");
+      const response = await fetch(`http://127.0.0.1:${pythonPort}/disconnect-all-servers`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json().catch(() => ({ message: "No response body" }));
+        console.log("[app.before-quit] All MCP servers disconnected successfully:", result);
+        // Give a moment for processes to clean up
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } else {
+        const errorData = await response.json().catch(() => ({ message: "No error details" }));
+        console.warn(`[app.before-quit] Failed to disconnect MCP servers - Status: ${response.status}, Error:`, errorData);
+      }
+    }
+  } catch (error) {
+    console.error("[app.before-quit] Error disconnecting MCP servers:", error);
+  }
+
   // Kill Python process if it's still running
   if (pythonProcess) {
-    pythonProcess.kill();
+    console.log("[app.before-quit] Terminating Python process...");
+    pythonProcess.kill('SIGTERM');
+
+    // Give it a moment to terminate gracefully
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Force kill if still running
+    if (pythonProcess && !pythonProcess.killed) {
+      console.log("[app.before-quit] Force killing Python process...");
+      pythonProcess.kill('SIGKILL');
+    }
+  }
+
+  // Now actually quit - this will trigger quit event but not before-quit again
+  setTimeout(() => {
+    app.quit();
+  }, 100);
+});
+
+app.on("quit", () => {
+  console.log("[app.quit] App quitting (final cleanup).");
+
+  // Final safety check - kill Python process if somehow still running
+  if (pythonProcess && !pythonProcess.killed) {
+    console.log("[app.quit] Force killing any remaining Python process...");
+    pythonProcess.kill('SIGKILL');
   }
 });
 
