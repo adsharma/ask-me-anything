@@ -4,3 +4,7 @@ python_backend/.venv
 python_backend/.env
 python_backend/uv.lock
 mcp-gemini-desktop/dist/
+*.db
+node_modules/
+mcp-ai-desktop/dist/
+mcp-ai-desktop/.env
