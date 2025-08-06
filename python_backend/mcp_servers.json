@@ -7,6 +7,11 @@
         "SEARXNG_URL": "http://localhost:8888"
       },
       "disabled": false
+    },
+    "triples": {
+      "command": "python",
+      "args": ["mcp_servers/mcp_server_triples.py"],
+      "disabled": false
     }
   }
 }

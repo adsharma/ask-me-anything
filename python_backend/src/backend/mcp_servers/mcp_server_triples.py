@@ -1,22 +1,25 @@
 # server.py - A simple MCP server that can add, subtract, multiply, and divide two numbers
 from mcp.server.fastmcp import FastMCP
 import duckdb
+import os
 
 # Create an MCP server
 mcp = FastMCP("Triples")
 
 @mcp.tool()
-def print_node_triples(label_to_find):
+def print_node_triples(label_to_find, limit: int = 10):
     """
     Prints knowledge graph triples for a given node label.
 
     Args:
         label_to_find: The label of the node to find the triples for.
-
+        limit: The number of triples to print.
     Returns:
         A string containing the triples for the given node label.
     """
     # Connect to DuckDB and attach the databases
+    print(f"Connecting to DuckDB and attaching databases...")
+    print(f"Current working directory: {os.getcwd()}")
     con = duckdb.connect('knowledge-graph/truthy.db')
     con.execute("ATTACH 'knowledge-graph/labels.db' AS nodes")
     con.execute("ATTACH 'knowledge-graph/edge_meta.db' AS edges")
@@ -34,11 +37,12 @@ def print_node_triples(label_to_find):
     JOIN nodes.labels l2 ON r.e2 = l2.e1
     WHERE l1.label = ?
     ORDER BY l1.e1
+    LIMIT ?
     """
     
     results = "Triples for node '{label_to_find}':\n"
     # Execute the query with the provided label
-    df = con.execute(query, [label_to_find]).df()
+    df = con.execute(query, [label_to_find, limit]).df()
     if not df.empty:
         for index, row in df.iterrows():
             results += f"id: {row['id']}: ({row['subject']}) - [{row['predicate']}] - ({row['object']})\n"
