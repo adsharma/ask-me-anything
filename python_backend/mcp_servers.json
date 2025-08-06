@@ -9,9 +9,9 @@
       "disabled": false
     },
     "triples": {
-      "command": "python",
-      "args": ["mcp_servers/mcp_server_triples.py"],
-      "disabled": false
+      "command": "uv",
+      "args": ["run", "../python_backend/src/backend/mcp_servers/mcp_server_triples.py"],
+      "disabled": true
     }
   }
 }

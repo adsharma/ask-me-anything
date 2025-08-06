@@ -6,6 +6,23 @@ import os
 # Create an MCP server
 mcp = FastMCP("Triples")
 
+KG_DIR='../python_backend/src/backend/knowledge-graph'
+
+class TripleStore:
+    def __init__(self):
+        self._con = None
+
+    def get_connection(self):
+        if self._con is None:
+            print(f"Connecting to DuckDB and attaching databases...")
+            print(f"Current working directory: {os.getcwd()}")
+            self._con = duckdb.connect(f'{KG_DIR}/truthy.db')
+            self._con.execute(f"ATTACH '{KG_DIR}/labels.db' AS nodes")
+            self._con.execute(f"ATTACH '{KG_DIR}/edge_meta.db' AS edges")
+        return self._con
+
+triple_store = TripleStore()
+
 @mcp.tool()
 def print_node_triples(label_to_find, limit: int = 10):
     """
@@ -18,11 +35,7 @@ def print_node_triples(label_to_find, limit: int = 10):
         A string containing the triples for the given node label.
     """
     # Connect to DuckDB and attach the databases
-    print(f"Connecting to DuckDB and attaching databases...")
-    print(f"Current working directory: {os.getcwd()}")
-    con = duckdb.connect('knowledge-graph/truthy.db')
-    con.execute("ATTACH 'knowledge-graph/labels.db' AS nodes")
-    con.execute("ATTACH 'knowledge-graph/edge_meta.db' AS edges")
+    con = triple_store.get_connection()
 
     # Query to find the node by label and join with relations and edge_types
     query = """
