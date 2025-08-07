@@ -451,24 +451,9 @@ app.on("before-quit", async (event) => {
           console.log("[app.before-quit] Taskkill stdout:", killResult.stdout.trim());
         }
 
-        // If taskkill failed, try alternative approaches
+        // If taskkill failed, log the failure but don't kill unrelated processes
         if (killResult.status !== 0) {
-          console.log("[app.before-quit] Taskkill failed, trying alternative kill methods...");
-
-          // Try killing individual processes by name
-          const killPythonResult = spawnSync('taskkill', ['/f', '/im', 'python.exe'], {
-            windowsHide: true,
-            timeout: 2000,
-            encoding: 'utf8'
-          });
-          console.log(`[app.before-quit] Kill python.exe result: ${killPythonResult.status}`);
-
-          const killUvResult = spawnSync('taskkill', ['/f', '/im', 'uv.exe'], {
-            windowsHide: true,
-            timeout: 2000,
-            encoding: 'utf8'
-          });
-          console.log(`[app.before-quit] Kill uv.exe result: ${killUvResult.status}`);
+          console.log("[app.before-quit] Taskkill failed, but avoiding killing unrelated processes");
         }
 
         // Also send SIGTERM to the main process as backup
@@ -511,11 +496,9 @@ app.on("before-quit", async (event) => {
           });
           console.log(`[app.before-quit] Force kill completed with exit code: ${forceKillResult.status}`);
 
-          // Also try killing by name as final resort
+          // Log the failure but don't kill unrelated processes
           if (forceKillResult.status !== 0) {
-            console.log("[app.before-quit] Final resort: killing all python/uv processes...");
-            spawnSync('taskkill', ['/f', '/im', 'python.exe'], { windowsHide: true, timeout: 1000 });
-            spawnSync('taskkill', ['/f', '/im', 'uv.exe'], { windowsHide: true, timeout: 1000 });
+            console.log("[app.before-quit] Force kill also failed, but avoiding killing unrelated processes");
           }
         } catch (error) {
           console.error("[app.before-quit] Error force killing Windows process:", error);
