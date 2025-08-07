@@ -2,7 +2,31 @@
 import {marked} from "./node_modules/marked/lib/marked.esm.js";
 import katex from "./node_modules/katex/dist/katex.mjs";
 
+// Dark mode logic
+if (window.darkMode) {
+  window.darkMode.onChange((enabled) => {
+    if (enabled) {
+      document.body.classList.add('dark');
+      const darkModeToggle = document.getElementById('dark-mode-toggle');
+      if (darkModeToggle) darkModeToggle.textContent = '☀️';
+    } else {
+      document.body.classList.remove('dark');
+      const darkModeToggle = document.getElementById('dark-mode-toggle');
+      if (darkModeToggle) darkModeToggle.textContent = '🌙';
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  // Dark mode toggle functionality
+  const darkModeToggle = document.getElementById('dark-mode-toggle');
+  if (darkModeToggle && window.darkMode) {
+    darkModeToggle.addEventListener('click', () => {
+      const isDark = document.body.classList.contains('dark');
+      window.darkMode.toggle(!isDark);
+      // Icon will be updated by the onChange handler above
+    });
+  }
   const messageInput = document.getElementById("message-input");
   const sendBtn = document.getElementById("send-btn");
   const chatMessages = document.getElementById("chat-messages");

@@ -1,24 +1,88 @@
+/* Dark mode variables */
+:root {
+  --bg-color: #fdfcf7;
+  --text-color: #4a3f32;
+  --panel-bg: #f4f1e7;
+  --border-color: #dcd3c4;
+  --sidebar-bg: #f4f1e7;
+  --chat-bg: #fdfcf7;
+  --input-bg: #f4f1e7;
+  --accent-color: #6b5a48;
+  --accent-hover: #5d4e3c;
+  --user-message-bg: #6b5a48;
+  --user-message-text: #fdfcf7;
+  --ai-message-bg: #f2f2f0;
+  --ai-message-text: #4a3f32;
+  --system-message-bg: #f4f1e7;
+  --system-message-border: #d4cfc3;
+  --system-summary-text: #8c7d6b;
+  --status-connected: #5d875d;
+  --status-error: #b9615c;
+  --text-primary: #4a3f32;
+  --text-secondary: #8c7d6b;
+}
+
+body.dark {
+  --bg-color: #1a1a1a;
+  --text-color: #e4e4e4;
+  --panel-bg: #2d2d2d;
+  --border-color: #404040;
+  --sidebar-bg: #2d2d2d;
+  --chat-bg: #1a1a1a;
+  --input-bg: #2d2d2d;
+  --accent-color: #7a6b5a;
+  --accent-hover: #8c7d6b;
+  --user-message-bg: #7a6b5a;
+  --user-message-text: #ffffff;
+  --ai-message-bg: #333333;
+  --ai-message-text: #e4e4e4;
+  --system-message-bg: #2d2d2d;
+  --system-message-border: #404040;
+  --system-summary-text: #b4a596;
+  --status-connected: #7aa67a;
+  --status-error: #d48b87;
+  --text-primary: #e4e4e4;
+  --text-secondary: #b4a596;
+}
+
+body, html {
+  background: var(--bg-color) !important;
+  color: var(--text-color) !important;
+}
+
+.panel, .settings-panel, .modal, .window, .main-content {
+  background: var(--panel-bg) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+button, input, select, textarea {
+  background: var(--panel-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.dark-mode-toggle {
+  -webkit-app-region: no-drag;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
 /* style.css */
 :root {
   --font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
     Ubuntu, Helvetica, Arial, sans-serif;
-  --sidebar-bg: #f4f1e7; /* Warm beige/tan */
-  --chat-bg: #fdfcf7; /* Very light warm cream */
-  --input-bg: #f4f1e7; /* Warm beige/tan */
-  --border-color: #dcd3c4; /* Soft warm brown border */
-  --text-primary: #4a3f32; /* Darker warm brown */
-  --text-secondary: #8c7d6b; /* Lighter warm brown */
-  --accent-color: #6b5a48; /* Warm dark brown/sepia */
-  --accent-hover: #5d4e3c; /* Darker brown for hover */
-  --user-message-bg: var(--accent-color);
-  --user-message-text: #fdfcf7; /* Light cream for text on dark bg */
-  --ai-message-bg: #f2f2f0; /* Slightly warm light grey */
-  --ai-message-text: var(--text-primary);
-  --system-message-bg: var(--sidebar-bg);
-  --system-message-border: #d4cfc3; /* Slightly darker than sidebar */
-  --system-summary-text: var(--text-secondary);
-  --status-connected: #5d875d; /* Muted green */
-  --status-error: #b9615c; /* Muted red */
   --title-bar-height: 38px;
   --sidebar-width: 260px;
   --header-height: 85px;
@@ -47,9 +111,39 @@ body {
   z-index: 100;
   border-bottom: 1px solid var(--border-color);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   padding: 0 10px;
+  /* Debug: make sure title bar is visible */
+  min-height: var(--title-bar-height);
+}
+
+.dark-mode-toggle {
+  -webkit-app-region: no-drag;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 14px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode-toggle:hover {
+  background-color: var(--accent-color);
+  color: var(--user-message-text);
+}
+
+body.dark .dark-mode-toggle:hover {
+  background-color: var(--accent-hover);
+  color: var(--user-message-text);
 }
 
 .window-controls {

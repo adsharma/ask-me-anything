@@ -1,5 +1,10 @@
 // preload.js
-const {contextBridge, ipcRenderer} = require("electron");
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('darkMode', {
+  toggle: (enable) => ipcRenderer.send('toggle-dark-mode', enable),
+  onChange: (callback) => ipcRenderer.on('set-dark-mode', (event, enabled) => callback(enabled))
+});
 
 contextBridge.exposeInMainWorld("electronAPI", {
   getPythonPort: () => ipcRenderer.invoke("get-python-port"),

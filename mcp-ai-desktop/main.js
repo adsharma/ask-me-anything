@@ -1,4 +1,5 @@
 // main.js
+const { nativeTheme } = require('electron');
 const {app, BrowserWindow, ipcMain, dialog} = require("electron");
 const path = require("path");
 const fs = require("fs").promises; // Import fs promises
@@ -100,6 +101,15 @@ function createWindow() {
     ), // Optional: set icon for window itself
   });
   console.log("[createWindow] BrowserWindow created.");
+
+  // Set dark mode class on load
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (nativeTheme.shouldUseDarkColors) {
+      mainWindow.webContents.send('set-dark-mode', true);
+    } else {
+      mainWindow.webContents.send('set-dark-mode', false);
+    }
+  });
 
   const indexPath = path.join(__dirname, "index.html");
   console.log(`[createWindow] Attempting to load file: ${indexPath}`);
@@ -443,6 +453,14 @@ app.on("quit", () => {
 
 ipcMain.handle("get-python-port", async () => {
   return pythonPort;
+});
+
+// Listen for dark mode toggle from renderer
+ipcMain.on('toggle-dark-mode', (event, enable) => {
+  nativeTheme.themeSource = enable ? 'dark' : 'light';
+  if (mainWindow) {
+    mainWindow.webContents.send('set-dark-mode', enable);
+  }
 });
 
 ipcMain.handle("get-backend-types", async () => {
