@@ -16,7 +16,10 @@
     "Personal Assistant",
     "Ask Me Anything"
   ],
-  "author": "Your Name",
+  "author": {
+    "name": "Arun Sharma",
+    "email": "arun@sharma-home.net"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
