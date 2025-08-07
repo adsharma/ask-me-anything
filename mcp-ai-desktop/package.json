@@ -18,6 +18,10 @@
   ],
   "author": "Your Name",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adsharma/ask-me-anything.git"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2",
     "electron": "^31.1.0",
