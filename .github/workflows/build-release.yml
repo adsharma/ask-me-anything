@@ -173,7 +173,9 @@ jobs:
 
           echo "=== Release files prepared ==="
           ls -la ./release-files/
-          echo "=============================="      - name: Create Release
+          echo "=============================="
+
+      - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
         env:
