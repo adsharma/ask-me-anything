@@ -655,13 +655,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function initializeApp() {
+  async function updateModelDisplay() {
+  try {
+    const model = await window.electronAPI.getModel();
+    const modelDisplay = document.getElementById('model-display');
+    if (modelDisplay) {
+      modelDisplay.textContent = `Model: ${model || 'Unknown'}`;
+    }
+  } catch (error) {
+    console.error("Error updating model display:", error);
+    const modelDisplay = document.getElementById('model-display');
+    if (modelDisplay) {
+      modelDisplay.textContent = 'Model: Error';
+    }
+  }
+}
+
+async function initializeApp() {
     try {
       pythonPort = await window.electronAPI.getPythonPort();
       console.log(`Python backend running on port: ${pythonPort}`);
       addMessage("Ask me Anything!", "ai");
       addMessage("💡 You can now upload images by clicking the image button or dragging and dropping them into the chat!", "system");
       await fetchAndRenderServers();
+      await updateModelDisplay(); // Update model display on initialization
       if (!serverRefreshInterval) {
         serverRefreshInterval = setInterval(fetchAndRenderServers, 10000);
       }
@@ -722,6 +739,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Update display if debug pane is open
     if (debugPane.classList.contains("active")) {
       updateDebugContent();
+    }
+  });
+
+  // Listen for model updates and refresh the display
+  window.electronAPI.onModelUpdate((data) => {
+    if (data.success) {
+      updateModelDisplay();
+      addMessage(`Model changed to: ${data.model}`, "system");
+    } else {
+      addMessage(`Failed to change model: ${data.message}`, "system");
     }
   });
 
@@ -1040,7 +1067,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   closeSettingsBtn.addEventListener("click", closeSettings);
   settingsOverlay.addEventListener("click", closeSettings);
   settingsCancelBtn.addEventListener("click", closeSettings);
-  settingsSaveBtn.addEventListener("click", saveSettings);
+  settingsSaveBtn.addEventListener("click", async () => {
+    await saveSettings();
+    // Update model display after saving settings
+    await updateModelDisplay();
+  });
 
   // Window close button event listener
   if (closeWindowBtn) {

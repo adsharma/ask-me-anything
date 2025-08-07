@@ -21,12 +21,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getModelHelpers: () => ipcRenderer.invoke("get-model-helpers"),
   getCurrentBackend: () => ipcRenderer.invoke("get-current-backend"),
   setBackend: (backendType) => ipcRenderer.invoke("set-backend", backendType),
+  // Model functions
+  getModel: () => ipcRenderer.invoke("get-model"),
+  setModel: (modelName) => ipcRenderer.invoke("set-model", modelName),
+  listModels: () => ipcRenderer.invoke("list-models"),
   // Settings functions
   getCurrentSettings: () => ipcRenderer.invoke("get-current-settings"),
   getAvailableModels: () => ipcRenderer.invoke("get-available-models"),
   saveApiKey: (apiKey, model, backend) => ipcRenderer.invoke("save-api-key", apiKey, model, backend),
   onApiKeyUpdate: (callback) =>
     ipcRenderer.on("api-key-update-status", (event, ...args) =>
+      callback(...args)
+    ),
+  onModelUpdate: (callback) =>
+    ipcRenderer.on("model-update-status", (event, ...args) =>
       callback(...args)
     ),
   // Debug pane functions

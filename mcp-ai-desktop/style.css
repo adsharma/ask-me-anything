@@ -118,6 +118,16 @@ body {
   min-height: var(--title-bar-height);
 }
 
+.model-display {
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  margin: 0 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
 .dark-mode-toggle {
   -webkit-app-region: no-drag;
   background: var(--panel-bg);

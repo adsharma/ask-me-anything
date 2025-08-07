@@ -498,6 +498,15 @@ ipcMain.handle("set-backend", async (event, backendType) => {
         }
 
         console.log(`[set-backend] Python backend informed about backend change to: ${backendType}`);
+
+        // Notify renderer about backend change to update model display
+        if (mainWindow) {
+          mainWindow.webContents.send('model-update-status', {
+            success: true,
+            message: `Backend changed to ${backendType}`,
+            backend: backendType
+          });
+        }
       }
     } catch (error) {
       console.error(`[set-backend] Error informing Python backend about backend change:`, error);
@@ -752,6 +761,15 @@ ipcMain.handle("save-api-key", async (event, apiKey, model, backend) => {
       const modelData = await modelResponse.json();
       if (!modelResponse.ok) {
         throw new Error(modelData.message || `HTTP error! status: ${modelResponse.status}`);
+      }
+
+      // Notify renderer about model change
+      if (mainWindow) {
+        mainWindow.webContents.send('model-update-status', {
+          success: true,
+          message: `Model changed to ${model}`,
+          model: model
+        });
       }
     }
 
