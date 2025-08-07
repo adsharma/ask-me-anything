@@ -137,7 +137,35 @@ jobs:
           path: ./artifacts
 
       - name: Display structure of downloaded files
-        run: ls -la ./artifacts
+        run: |
+          echo "=== Artifacts structure ==="
+          find ./artifacts -type f -name "*" | sort
+          echo "=========================="
+
+      - name: Prepare release files
+        run: |
+          mkdir -p ./release-files
+
+          # Copy all files to a flat structure for easier uploading
+          if [ -d "./artifacts/windows-installer" ]; then
+            cp ./artifacts/windows-installer/* ./release-files/ 2>/dev/null || true
+          fi
+
+          if [ -d "./artifacts/macos-installer" ]; then
+            cp ./artifacts/macos-installer/* ./release-files/ 2>/dev/null || true
+          fi
+
+          if [ -d "./artifacts/linux-installer-x64" ]; then
+            cp ./artifacts/linux-installer-x64/* ./release-files/ 2>/dev/null || true
+          fi
+
+          if [ -d "./artifacts/linux-installer-arm64" ]; then
+            cp ./artifacts/linux-installer-arm64/* ./release-files/ 2>/dev/null || true
+          fi
+
+          echo "=== Release files prepared ==="
+          ls -la ./release-files/
+          echo "=============================="
 
       - name: Create Release
         id: create_release
@@ -168,8 +196,5 @@ jobs:
 
           draft: false
           prerelease: false
-          files: |
-            ./artifacts/windows-installer/*
-            ./artifacts/macos-installer/*
-            ./artifacts/linux-installer-x64/*
-            ./artifacts/linux-installer-arm64/*
+          files: ./release-files/*
+          fail_on_unmatched_files: false
