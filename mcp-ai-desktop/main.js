@@ -11,6 +11,8 @@ let settingsWindow = null;
 let pythonProcess = null;
 const pythonPort = 5001;
 let isQuitting = false; // Flag to prevent cleanup loop
+let backendReady = false; // Track backend readiness
+let backendStartupStage = 'starting'; // Track startup stage
 
 // Backend configuration using LiteLLM providers
 const BACKEND_TYPES = {
@@ -43,6 +45,107 @@ const MODEL_HELPERS = {
 };
 
 let currentBackend = BACKEND_TYPES.OLLAMA; // Default to Ollama for local models
+
+// Backend status checking function
+async function checkBackendStatus() {
+  try {
+    const response = await fetch(`http://127.0.0.1:${pythonPort}/validate-backend`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      backendReady = data.status === 'success';
+      return { ready: backendReady, stage: 'ready' };
+    } else {
+      return { ready: false, stage: 'starting' };
+    }
+  } catch (error) {
+    return { ready: false, stage: 'starting' };
+  }
+}
+
+// Monitor backend startup progress
+async function monitorBackendStartup() {
+  const maxAttempts = 30; // 30 seconds max wait time
+  let attempts = 0;
+
+  const checkInterval = setInterval(async () => {
+    attempts++;
+
+    if (attempts > maxAttempts) {
+      clearInterval(checkInterval);
+      backendStartupStage = 'error';
+      if (mainWindow) {
+        mainWindow.webContents.send('backend-status-update', {
+          stage: 'error',
+          message: 'Backend startup timed out'
+        });
+      }
+      return;
+    }
+
+    // Check if Python process is running and responsive
+    try {
+      // First check if Flask server is responding
+      const response = await fetch(`http://127.0.0.1:${pythonPort}/validate-backend`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        clearInterval(checkInterval);
+        backendReady = true;
+        backendStartupStage = 'ready';
+        if (mainWindow) {
+          mainWindow.webContents.send('backend-status-update', {
+            stage: 'ready',
+            message: 'Backend is ready'
+          });
+        }
+      } else {
+        // Backend responding but not ready yet
+        backendStartupStage = 'initializing';
+        if (mainWindow) {
+          mainWindow.webContents.send('backend-status-update', {
+            stage: 'initializing',
+            message: 'Initializing AI backend...'
+          });
+        }
+      }
+    } catch (error) {
+      // Still starting up
+      if (attempts < 5) {
+        backendStartupStage = 'starting';
+        if (mainWindow) {
+          mainWindow.webContents.send('backend-status-update', {
+            stage: 'starting',
+            message: 'Starting Python backend...'
+          });
+        }
+      } else if (attempts < 15) {
+        backendStartupStage = 'connecting';
+        if (mainWindow) {
+          mainWindow.webContents.send('backend-status-update', {
+            stage: 'connecting',
+            message: 'Connecting to backend service...'
+          });
+        }
+      } else {
+        backendStartupStage = 'initializing';
+        if (mainWindow) {
+          mainWindow.webContents.send('backend-status-update', {
+            stage: 'initializing',
+            message: 'Initializing AI models...'
+          });
+        }
+      }
+    }
+  }, 1000); // Check every second
+}
 
 function createSettingsWindow() {
   if (settingsWindow) {
@@ -176,6 +279,9 @@ app.whenReady().then(() => {
   };
 
   pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], spawnOptions);
+
+  // Start monitoring backend startup
+  monitorBackendStartup();
 
   pythonProcess.stdout.on('data', (data) => {
     console.log(`[Python Backend] ${data}`);
@@ -453,6 +559,10 @@ app.on("quit", () => {
 
 ipcMain.handle("get-python-port", async () => {
   return pythonPort;
+});
+
+ipcMain.handle("check-backend-status", async () => {
+  return await checkBackendStatus();
 });
 
 // Listen for dark mode toggle from renderer

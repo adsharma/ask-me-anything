@@ -175,6 +175,42 @@
         </div>
       </div>
     </div>
+
+    <!-- Startup Progress Overlay -->
+    <div id="startup-overlay" class="startup-overlay">
+      <div class="startup-content">
+        <div class="startup-logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        </div>
+        <h2>Ask Me Anything</h2>
+        <p class="startup-subtitle">AI-powered personal assistant</p>
+
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div class="progress-fill" id="startup-progress-fill"></div>
+          </div>
+          <p class="progress-text" id="startup-progress-text">Starting up...</p>
+        </div>
+
+        <div class="startup-details">
+          <div class="startup-step" id="step-backend">
+            <div class="step-icon" id="step-backend-icon">⏳</div>
+            <span>Starting backend service</span>
+          </div>
+          <div class="startup-step" id="step-connecting">
+            <div class="step-icon" id="step-connecting-icon">⏳</div>
+            <span>Connecting to AI service</span>
+          </div>
+          <div class="startup-step" id="step-initializing">
+            <div class="step-icon" id="step-initializing-icon">⏳</div>
+            <span>Initializing AI models</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script
       type="module"
       src="renderer.js"></script>

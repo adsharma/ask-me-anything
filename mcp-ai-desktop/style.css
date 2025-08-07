@@ -1114,3 +1114,136 @@ body.dark .dark-mode-toggle:hover {
   opacity: 1;
   visibility: visible;
 }
+
+/* Startup Progress Overlay */
+.startup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-color);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.startup-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.startup-content {
+  text-align: center;
+  max-width: 400px;
+  padding: 2rem;
+}
+
+.startup-logo {
+  margin-bottom: 1.5rem;
+  color: var(--accent-color);
+  animation: pulse 2s infinite;
+}
+
+.startup-content h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.startup-subtitle {
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+
+.progress-container {
+  margin-bottom: 2rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-color);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.progress-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.startup-details {
+  text-align: left;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.startup-step {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: var(--panel-bg);
+  transition: all 0.3s ease;
+}
+
+.startup-step.active {
+  background: var(--accent-color);
+  color: var(--user-message-text);
+}
+
+.startup-step.completed {
+  background: var(--status-connected);
+  color: white;
+}
+
+.step-icon {
+  width: 20px;
+  text-align: center;
+  margin-right: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.startup-step.active .step-icon {
+  animation: spin 1s linear infinite;
+}
+
+.startup-step.completed .step-icon::before {
+  content: "✓";
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

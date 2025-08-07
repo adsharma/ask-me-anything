@@ -60,6 +60,69 @@ document.addEventListener("DOMContentLoaded", async () => {
   let pythonPort = null;
   let serverRefreshInterval = null;
   let selectedImageData = null; // Store the selected image data
+  let backendReady = false; // Track backend readiness
+
+  // Startup progress elements
+  const startupOverlay = document.getElementById("startup-overlay");
+  const startupProgressFill = document.getElementById("startup-progress-fill");
+  const startupProgressText = document.getElementById("startup-progress-text");
+  const stepBackend = document.getElementById("step-backend");
+  const stepConnecting = document.getElementById("step-connecting");
+  const stepInitializing = document.getElementById("step-initializing");
+
+  // Startup progress management
+  function updateStartupProgress(stage, message) {
+    if (!startupOverlay) return;
+
+    // Reset all steps
+    stepBackend.classList.remove('active', 'completed');
+    stepConnecting.classList.remove('active', 'completed');
+    stepInitializing.classList.remove('active', 'completed');
+
+    let progress = 0;
+
+    switch(stage) {
+      case 'starting':
+        progress = 25;
+        stepBackend.classList.add('active');
+        break;
+      case 'connecting':
+        progress = 50;
+        stepBackend.classList.add('completed');
+        stepConnecting.classList.add('active');
+        break;
+      case 'initializing':
+        progress = 75;
+        stepBackend.classList.add('completed');
+        stepConnecting.classList.add('completed');
+        stepInitializing.classList.add('active');
+        break;
+      case 'ready':
+        progress = 100;
+        stepBackend.classList.add('completed');
+        stepConnecting.classList.add('completed');
+        stepInitializing.classList.add('completed');
+        // Hide overlay after a brief delay
+        setTimeout(() => {
+          startupOverlay.classList.add('hidden');
+          backendReady = true;
+        }, 1000);
+        break;
+      case 'error':
+        progress = 0;
+        startupProgressText.textContent = message || 'Error during startup';
+        startupProgressText.style.color = 'var(--status-error)';
+        return;
+    }
+
+    startupProgressFill.style.width = `${progress}%`;
+    startupProgressText.textContent = message || 'Loading...';
+  }
+
+  // Listen for backend status updates
+  window.electronAPI.onBackendStatusUpdate((data) => {
+    updateStartupProgress(data.stage, data.message);
+  });
 
   function renderLaTeX(text) {
     const latexPlaceholders = [];
@@ -460,6 +523,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    if (!backendReady) {
+      addMessage("Please wait for the backend to finish initializing...", "system");
+      return;
+    }
+
     // Create message data object
     const messageData = {
       text: message || "" // Ensure we always send a text field, even if empty
@@ -672,9 +740,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 }
 
 async function initializeApp() {
+    // Show initial startup progress
+    updateStartupProgress('starting', 'Starting Python backend...');
+
     try {
       pythonPort = await window.electronAPI.getPythonPort();
       console.log(`Python backend running on port: ${pythonPort}`);
+
+      // Wait for backend to be ready before proceeding
+      await waitForBackendReady();
+
       addMessage("Ask me Anything!", "ai");
       addMessage("💡 You can now upload images by clicking the image button or dragging and dropping them into the chat!", "system");
       await fetchAndRenderServers();
@@ -684,6 +759,7 @@ async function initializeApp() {
       }
     } catch (error) {
       console.error("Error initializing app:", error);
+      updateStartupProgress('error', 'Error connecting to backend. Please ensure it is running.');
       addMessage(
         "Error connecting to backend. Please ensure it is running.",
         "system"
@@ -693,6 +769,32 @@ async function initializeApp() {
         clearInterval(serverRefreshInterval);
         serverRefreshInterval = null;
       }
+    }
+  }
+
+  // Wait for backend to be ready
+  async function waitForBackendReady() {
+    const maxAttempts = 30;
+    let attempts = 0;
+
+    while (attempts < maxAttempts && !backendReady) {
+      try {
+        const status = await window.electronAPI.checkBackendStatus();
+        if (status.ready) {
+          backendReady = true;
+          updateStartupProgress('ready', 'Backend is ready!');
+          return;
+        }
+      } catch (error) {
+        console.log("Backend not ready yet, waiting...");
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
+    }
+
+    if (!backendReady) {
+      throw new Error("Backend startup timeout");
     }
   }
 

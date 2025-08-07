@@ -42,4 +42,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("python-backend-output", (event, ...args) =>
       callback(...args)
     ),
+  // Backend status functions
+  onBackendStatusUpdate: (callback) =>
+    ipcRenderer.on("backend-status-update", (event, ...args) =>
+      callback(...args)
+    ),
+  checkBackendStatus: () => ipcRenderer.invoke("check-backend-status"),
 });
