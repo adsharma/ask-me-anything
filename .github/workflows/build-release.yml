@@ -1,0 +1,229 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags (e.g., v1.0.0, v2.1.3)
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            arch: x64
+            ext: .exe
+          - os: macos-latest
+            platform: mac
+            arch: universal
+            ext: .dmg
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            ext: .AppImage
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            ext: .AppImage
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv (Python package manager)
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+            echo "$env:USERPROFILE\.cargo\bin" >> $GITHUB_PATH
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+        shell: bash
+
+      - name: Install Python dependencies
+        run: |
+          cd python_backend
+          uv sync
+        shell: bash
+
+      - name: Install Node.js dependencies
+        run: |
+          cd mcp-ai-desktop
+          npm install
+
+      - name: Build Electron app
+        run: |
+          cd mcp-ai-desktop
+          npm run dist -- --${{ matrix.platform }} --${{ matrix.arch }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            mcp-ai-desktop/dist/*.exe
+            mcp-ai-desktop/dist/*.msi
+
+      - name: Upload macOS artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: |
+            mcp-ai-desktop/dist/*.dmg
+            mcp-ai-desktop/dist/*.zip
+
+      - name: Upload Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installer-${{ matrix.arch }}
+          path: |
+            mcp-ai-desktop/dist/*.AppImage
+            mcp-ai-desktop/dist/*.deb
+            mcp-ai-desktop/dist/*.rpm
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -la ./artifacts
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            Release ${{ github.ref_name }}
+
+            ## Downloads
+
+            ### Windows
+            - Download the `.exe` installer for Windows
+
+            ### macOS
+            - Download the `.dmg` installer for macOS
+
+            ### Linux
+            - Download the `.AppImage` for portable Linux installation (x64)
+            - Download the `.AppImage` for portable Linux installation (ARM64)
+            - Download the `.deb` package for Debian/Ubuntu (x64)
+            - Download the `.deb` package for Debian/Ubuntu (ARM64)
+            - Download the `.rpm` package for Red Hat/Fedora (x64)
+            - Download the `.rpm` package for Red Hat/Fedora (ARM64)
+
+          draft: false
+          prerelease: false
+
+      - name: Upload Windows installer to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/windows-installer/Ask Me Anything Setup *.exe
+          asset_name: ask-me-anything-windows-installer.exe
+          asset_content_type: application/octet-stream
+        continue-on-error: true
+
+      - name: Upload macOS installer to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/macos-installer/Ask Me Anything-*.dmg
+          asset_name: ask-me-anything-macos-installer.dmg
+          asset_content_type: application/octet-stream
+        continue-on-error: true
+
+      - name: Upload Linux AppImage x64 to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-installer-x64/Ask Me Anything-*.AppImage
+          asset_name: ask-me-anything-linux-x64-portable.AppImage
+          asset_content_type: application/octet-stream
+        continue-on-error: true
+
+      - name: Upload Linux AppImage ARM64 to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-installer-arm64/Ask Me Anything-*.AppImage
+          asset_name: ask-me-anything-linux-arm64-portable.AppImage
+          asset_content_type: application/octet-stream
+        continue-on-error: true
+
+      - name: Upload all release assets
+        run: |
+          # Upload all Windows files
+          for file in ./artifacts/windows-installer/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              gh release upload ${{ github.ref_name }} "$file" --clobber
+            fi
+          done
+
+          # Upload all macOS files
+          for file in ./artifacts/macos-installer/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              gh release upload ${{ github.ref_name }} "$file" --clobber
+            fi
+          done
+
+          # Upload all Linux x64 files
+          for file in ./artifacts/linux-installer-x64/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              gh release upload ${{ github.ref_name }} "$file" --clobber
+            fi
+          done
+
+          # Upload all Linux ARM64 files
+          for file in ./artifacts/linux-installer-arm64/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              gh release upload ${{ github.ref_name }} "$file" --clobber
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
