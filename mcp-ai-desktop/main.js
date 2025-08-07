@@ -3,7 +3,6 @@ const { nativeTheme } = require('electron');
 const {app, BrowserWindow, ipcMain, dialog} = require("electron");
 const path = require("path");
 const fs = require("fs").promises; // Import fs promises
-const fetch = require("node-fetch");
 const { spawn } = require('child_process');
 
 let mainWindow;
@@ -264,23 +263,30 @@ function createWindow() {
 app.whenReady().then(() => {
   console.log("[app.whenReady] App ready. Starting Python backend and creating window...");
 
-  // Start Python backend with uv
-  const pythonBackendPath = path.join(__dirname, '..', 'python_backend', 'src', 'backend', 'mcp_flask_backend.py');
+  // Determine Python backend path based on whether app is packaged
+  let pythonBackendPath;
+  let pythonBackendDir;
 
-  // Configure spawn options for better process management
+  if (app.isPackaged) {
+    // In production, use the packaged Python source with uv run
+    const resourcesPath = process.resourcesPath;
+    pythonBackendPath = path.join(resourcesPath, 'python_backend', 'src', 'backend', 'mcp_flask_backend.py');
+    pythonBackendDir = path.join(resourcesPath, 'python_backend');
+  } else {
+    // In development, use uv run with the Python script
+    pythonBackendPath = path.join(__dirname, '..', 'python_backend', 'src', 'backend', 'mcp_flask_backend.py');
+    pythonBackendDir = path.join(__dirname, '..', 'python_backend');
+  }
+
   const spawnOptions = {
-    cwd: path.join(__dirname, '..', 'python_backend'),
-    // On Windows, ensure child processes are properly tracked
+    cwd: pythonBackendDir,
     detached: false,
-    // On Windows, this helps with process group management
     shell: process.platform === 'win32',
-    // Store PID for better cleanup
     stdio: ['ignore', 'pipe', 'pipe']
   };
 
-  pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], spawnOptions);
-
-  // Start monitoring backend startup
+  console.log(`[app.whenReady] Using Python backend with uv run: ${pythonBackendPath}`);
+  pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], spawnOptions);  // Start monitoring backend startup
   monitorBackendStartup();
 
   pythonProcess.stdout.on('data', (data) => {

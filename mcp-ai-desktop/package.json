@@ -50,10 +50,17 @@
     ],
     "extraResources": [
       {
-        "from": "python_backend/dist/mcp_backend",
-        "to": "mcp_backend",
+        "from": "../python_backend",
+        "to": "python_backend",
         "filter": [
-          "**/*"
+          "**/*",
+          "!**/__pycache__",
+          "!**/venv",
+          "!**/.venv",
+          "!**/dist",
+          "!**/.git",
+          "!**/*.pyc",
+          "!**/*.pyo"
         ]
       }
     ]
@@ -61,7 +68,6 @@
   "dependencies": {
     "katex": "^0.16.11",
     "marked": "^13.0.2",
-    "node-fetch": "^2.7.0",
     "pnpm": "^10.13.1"
   }
 }
