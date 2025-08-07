@@ -20,6 +20,10 @@ jobs:
             platform: win
             arch: x64
             ext: .exe
+          - os: windows-latest
+            platform: win
+            arch: arm64
+            ext: .exe
           - os: macos-latest
             platform: mac
             arch: universal
@@ -98,7 +102,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
+          name: windows-installer-${{ matrix.arch }}
           path: |
             mcp-ai-desktop/dist/*.exe
             mcp-ai-desktop/dist/*.msi
@@ -147,8 +151,12 @@ jobs:
           mkdir -p ./release-files
 
           # Copy all files to a flat structure for easier uploading
-          if [ -d "./artifacts/windows-installer" ]; then
-            cp ./artifacts/windows-installer/* ./release-files/ 2>/dev/null || true
+          if [ -d "./artifacts/windows-installer-x64" ]; then
+            cp ./artifacts/windows-installer-x64/* ./release-files/ 2>/dev/null || true
+          fi
+
+          if [ -d "./artifacts/windows-installer-arm64" ]; then
+            cp ./artifacts/windows-installer-arm64/* ./release-files/ 2>/dev/null || true
           fi
 
           if [ -d "./artifacts/macos-installer" ]; then
@@ -165,9 +173,7 @@ jobs:
 
           echo "=== Release files prepared ==="
           ls -la ./release-files/
-          echo "=============================="
-
-      - name: Create Release
+          echo "=============================="      - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
         env:
@@ -181,7 +187,8 @@ jobs:
             ## Downloads
 
             ### Windows
-            - Download the `.exe` installer for Windows
+            - Download the `.exe` installer for Windows (x64)
+            - Download the `.exe` installer for Windows (ARM64)
 
             ### macOS
             - Download the `.dmg` installer for macOS
