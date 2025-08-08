@@ -51,7 +51,6 @@ async def initialize_chat_app():
 
 async def load_default_servers():
     """Load servers from mcp_servers.json configuration file"""
-    global chat_app
     app = await initialize_chat_app()
     if not app:
         logger.error("Cannot load default servers: Chat app not initialized")

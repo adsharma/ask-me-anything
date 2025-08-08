@@ -16,7 +16,7 @@ class TripleStore:
 
     def get_connection(self):
         if self._con is None:
-            print(f"Connecting to DuckDB and attaching databases...")
+            print("Connecting to DuckDB and attaching databases...")
             print(f"Current working directory: {os.getcwd()}")
             self._con = duckdb.connect(f"{KG_DIR}/truthy.db")
             self._con.execute(f"ATTACH '{KG_DIR}/labels.db' AS nodes")
