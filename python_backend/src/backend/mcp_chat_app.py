@@ -8,6 +8,7 @@ from contextlib import AsyncExitStack
 from typing import Any, Dict, List, Optional, Tuple
 
 from ai_backend_manager import AIBackendManager
+from conversation_db import ConversationDB
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors as genai_errors
@@ -24,13 +25,21 @@ load_dotenv()
 
 
 class MCPChatApp:
-    def __init__(self, backend_type: str = "ollama", model_name: str = None):
+    def __init__(self, backend_type: str = "ollama", model_name: Optional[str] = None):
         # Initialize the AI backend manager
         self.ai_backend = AIBackendManager()
         if backend_type:
             self.ai_backend.set_backend(backend_type)
         if model_name:
             self.ai_backend.set_model(model_name)
+
+        # Initialize database for conversation history
+        db_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "..", "data", "chat_history.db"
+        )
+        self.conversation_db = ConversationDB(db_path)
+        self.current_conversation_id: Optional[int] = None
+        self.session_id: Optional[str] = None
 
         # Legacy Gemini-specific properties (for backward compatibility)
         self.gemini_sync_client: Optional[genai.Client] = None
@@ -100,6 +109,132 @@ class MCPChatApp:
     def validate_configuration(self) -> Dict[str, Any]:
         """Validate the current backend configuration."""
         return self.ai_backend.validate_configuration()
+
+    # Conversation Management Methods
+    def start_new_conversation(self, title: Optional[str] = None) -> int:
+        """Start a new conversation session.
+
+        Args:
+            title: Optional title for the conversation
+
+        Returns:
+            conversation_id: The ID of the new conversation
+        """
+        import uuid
+
+        self.session_id = str(uuid.uuid4())
+
+        # Create conversation in database
+        metadata = {
+            "backend": self.ai_backend.get_backend(),
+            "model": self.ai_backend.get_model(),
+        }
+        self.current_conversation_id = self.conversation_db.create_conversation(
+            session_id=self.session_id, title=title, metadata=metadata
+        )
+
+        # Clear in-memory history for Gemini
+        self.chat_history = []
+
+        logger.info(
+            f"Started new conversation {self.current_conversation_id} with session {self.session_id}"
+        )
+        return self.current_conversation_id
+
+    def load_conversation(self, conversation_id: int) -> bool:
+        """Load an existing conversation.
+
+        Args:
+            conversation_id: ID of the conversation to load
+
+        Returns:
+            bool: True if conversation was loaded successfully
+        """
+        try:
+            # Get conversation from database
+            messages = self.conversation_db.get_conversation_messages(conversation_id)
+            if not messages:
+                logger.warning(f"No messages found for conversation {conversation_id}")
+                return False
+
+            self.current_conversation_id = conversation_id
+
+            # Load messages into Gemini format for backward compatibility
+            self.chat_history = []
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+
+                if role in ["user", "model"]:
+                    # Convert to Gemini Content format
+                    parts = [genai_types.Part(text=content)]
+                    self.chat_history.append(
+                        genai_types.Content(role=role, parts=parts)
+                    )
+                # Note: tool messages are more complex in Gemini format,
+                # would need additional handling for full restoration
+
+            logger.info(
+                f"Loaded conversation {conversation_id} with {len(messages)} messages"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Error loading conversation {conversation_id}: {e}")
+            return False
+
+    def get_current_conversation_id(self) -> Optional[int]:
+        """Get the current conversation ID."""
+        return self.current_conversation_id
+
+    def get_conversation_history(
+        self, conversation_id: Optional[int] = None, format_type: str = "openai"
+    ) -> List[Dict[str, Any]]:
+        """Get conversation history from database.
+
+        Args:
+            conversation_id: ID of conversation (uses current if None)
+            format_type: Format for the history ('openai', 'gemini', 'raw')
+
+        Returns:
+            List of formatted messages
+        """
+        if conversation_id is None:
+            conversation_id = self.current_conversation_id
+
+        if conversation_id is None:
+            return []
+
+        return self.conversation_db.get_conversation_history_formatted(
+            conversation_id, format_type
+        )
+
+    def add_message_to_history(
+        self,
+        role: str,
+        content: str,
+        message_type: str = "text",
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """Add a message to the current conversation history.
+
+        Args:
+            role: Message role ('user', 'assistant', 'system', 'tool', 'model')
+            content: Message content
+            message_type: Type of message
+            metadata: Optional metadata
+        """
+        if self.current_conversation_id is None:
+            # Start a new conversation if none exists
+            self.start_new_conversation()
+
+        self.conversation_db.add_message(
+            conversation_id=self.current_conversation_id,
+            role=role,
+            content=content,
+            message_type=message_type,
+            metadata=metadata,
+        )
 
     async def initialize_gemini(self):
         """Legacy method for Gemini initialization."""
@@ -610,6 +745,10 @@ class MCPChatApp:
     ) -> str:
         """Process query using LiteLLM for non-Gemini backends."""
         try:
+            # Start a new conversation if none exists
+            if maintain_context and self.current_conversation_id is None:
+                self.start_new_conversation()
+
             # Convert MCP tools to OpenAI function format if available
             tools = None
             if self.mcp_tools:
@@ -626,24 +765,31 @@ class MCPChatApp:
                     tool_descriptions
                 )
 
-            # Add conversation history to the message if maintaining context
+            # Get conversation history from database if maintaining context
             full_message = query
-            if maintain_context and hasattr(self, "_conversation_history"):
-                # Format conversation history for LiteLLM
-                history_text = "\n".join(
-                    [
-                        f"{msg['role']}: {msg['content']}"
-                        for msg in self._conversation_history
-                    ]
-                )
-                if history_text:
+            if maintain_context and self.current_conversation_id:
+                history = self.get_conversation_history(format_type="openai")
+                if history:
+                    # Format conversation history for LiteLLM
+                    history_text = "\n".join(
+                        [f"{msg['role']}: {msg['content']}" for msg in history]
+                    )
                     full_message = f"Previous conversation:\n{history_text}\n\nCurrent question: {query}"
+
+            # Add user message to database
+            if maintain_context:
+                self.add_message_to_history(
+                    role="user",
+                    content=query,
+                    message_type="image" if image_data else "text",
+                    metadata={"has_image": bool(image_data)},
+                )
 
             # Send request to backend with image support
             response = await self.ai_backend.chat_async(
                 message=full_message,
-                system_prompt=system_prompt,
-                tools=tools,
+                system_prompt=system_prompt or "",
+                tools=tools or [],
                 image_data=image_data,
             )
 
@@ -652,28 +798,24 @@ class MCPChatApp:
                 try:
                     tool_calls = json.loads(response)
                     result = await self._handle_tool_calls_litellm(tool_calls, query)
-                    # Add to conversation history
+
+                    # Add assistant response to database
                     if maintain_context:
-                        if not hasattr(self, "_conversation_history"):
-                            self._conversation_history = []
-                        self._conversation_history.append(
-                            {"role": "user", "content": query}
-                        )
-                        self._conversation_history.append(
-                            {"role": "assistant", "content": result}
+                        self.add_message_to_history(
+                            role="assistant",
+                            content=result,
+                            message_type="tool_response",
+                            metadata={"tool_calls": tool_calls},
                         )
                     return result
                 except (json.JSONDecodeError, KeyError):
                     # Not a tool call, return as regular response
                     pass
 
-            # Add to conversation history
+            # Add assistant response to database
             if maintain_context:
-                if not hasattr(self, "_conversation_history"):
-                    self._conversation_history = []
-                self._conversation_history.append({"role": "user", "content": query})
-                self._conversation_history.append(
-                    {"role": "assistant", "content": response}
+                self.add_message_to_history(
+                    role="assistant", content=response, message_type="text"
                 )
 
             return response
@@ -759,6 +901,10 @@ class MCPChatApp:
             logger.error("process_query called but Gemini client not initialized.")
             return "Error: Gemini client not initialized. Please set your API key via settings."
 
+        # Start a new conversation if none exists
+        if self.current_conversation_id is None:
+            self.start_new_conversation()
+
         # Prepare message parts
         parts = [genai_types.Part(text=query)]
 
@@ -779,6 +925,14 @@ class MCPChatApp:
             except Exception as e:
                 logger.error(f"Error processing image for Gemini: {e}")
                 return f"Error processing image: {e}"
+
+        # Add user message to database
+        self.add_message_to_history(
+            role="user",
+            content=query,
+            message_type="image" if image_data else "text",
+            metadata={"has_image": bool(image_data)},
+        )
 
         # Append user message with text and optional image
         logger.debug("Appending user message to history.")
@@ -871,6 +1025,22 @@ class MCPChatApp:
                     # Add end message using only the status string
                     tool_status_messages.append(
                         f"TOOL_CALL_END: {tool_name} status={tool_status_str}"
+                    )
+
+                    # Add tool call to database
+                    self.add_message_to_history(
+                        role="tool",
+                        content=(
+                            tool_content
+                            if tool_status_str == "Success" and tool_content
+                            else tool_status_str
+                        ),
+                        message_type="tool_result",
+                        metadata={
+                            "tool_name": tool_name,
+                            "tool_args": tool_args,
+                            "tool_status": tool_status_str,
+                        },
                     )
 
                     # Prepare the result for Gemini. Use the actual content on success,
@@ -979,6 +1149,16 @@ class MCPChatApp:
                             "Received empty response after tool call (no text part)."
                         )
 
+                    # Add final assistant response to database
+                    self.add_message_to_history(
+                        role="assistant",
+                        content=final_reply_text,
+                        message_type="text",
+                        metadata={
+                            "tool_calls_executed": len(function_calls_to_execute)
+                        },
+                    )
+
                     # Prepend status messages to the final reply
                     status_prefix = (
                         "\n".join(tool_status_messages) + "\n\n"
@@ -1000,7 +1180,14 @@ class MCPChatApp:
                 logger.info(
                     "Received standard text response from Gemini (no tool call)."
                 )
-                return model_content.parts[0].text
+                response_text = model_content.parts[0].text
+
+                # Add assistant response to database
+                self.add_message_to_history(
+                    role="assistant", content=response_text, message_type="text"
+                )
+
+                return response_text
             else:
                 logger.warning(
                     "Received Gemini response with no text part and no tool call."
@@ -1034,11 +1221,42 @@ class MCPChatApp:
         server_identifiers = list(self.server_resources.keys())
         for identifier in server_identifiers:
             await self.disconnect_mcp_server(identifier)
+
+        # Close database connection
+        if hasattr(self, "conversation_db"):
+            self.conversation_db.close()
+
         logger.info("MCPChatApp cleanup complete.")
 
     def clear_conversation_history(self):
         """Clear the conversation history."""
-        self.chat_history = []  # For Gemini
-        if hasattr(self, "_conversation_history"):
-            self._conversation_history = []  # For other backends
+        self.chat_history = []  # For Gemini in-memory history
+
+        # Clear current conversation in database
+        if self.current_conversation_id:
+            self.conversation_db.clear_conversation(self.current_conversation_id)
+            logger.info(
+                f"Cleared conversation history for conversation {self.current_conversation_id}"
+            )
+
+        # Start a new conversation
+        self.current_conversation_id = None
+        self.session_id = None
         logger.info("Conversation history cleared.")
+
+    def delete_conversation(self, conversation_id: int):
+        """Delete a conversation from database."""
+        self.conversation_db.delete_conversation(conversation_id)
+        if conversation_id == self.current_conversation_id:
+            self.current_conversation_id = None
+            self.session_id = None
+            self.chat_history = []
+        logger.info(f"Deleted conversation {conversation_id}")
+
+    def get_recent_conversations(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent conversations from database."""
+        return self.conversation_db.get_recent_conversations(limit)
+
+    def update_conversation_title(self, conversation_id: int, title: str):
+        """Update conversation title."""
+        self.conversation_db.update_conversation_title(conversation_id, title)
