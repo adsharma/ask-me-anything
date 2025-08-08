@@ -1,12 +1,14 @@
 # mcp_server_weather.py
+import logging
 from typing import Any
+
 import httpx
 from mcp.server.fastmcp import FastMCP
-import logging
 
 # Configure logging for the server
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP server
@@ -19,10 +21,7 @@ USER_AGENT = "mcp-gemini-chat-app/1.0"
 
 async def make_nws_request(url: str) -> dict[str, Any] | None:
     """Make a request to the NWS API with proper error handling."""
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "application/geo+json"
-    }
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/geo+json"}
     async with httpx.AsyncClient() as client:
         try:
             logger.info(f"Requesting NWS API: {url}")
@@ -32,7 +31,8 @@ async def make_nws_request(url: str) -> dict[str, Any] | None:
             return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(
-                f"NWS API request failed: {e.response.status_code} - {e.response.text}")
+                f"NWS API request failed: {e.response.status_code} - {e.response.text}"
+            )
             return None
         except Exception as e:
             logger.error(f"Error during NWS API request: {e}")
@@ -75,7 +75,11 @@ async def get_alerts(state: str) -> str:
 
     alerts = [format_alert(feature) for feature in data["features"]]
     logger.info(f"Found {len(alerts)} alerts for {state.upper()}")
-    return "\n---\n".join(alerts) if alerts else f"No active weather alerts for {state.upper()}."
+    return (
+        "\n---\n".join(alerts)
+        if alerts
+        else f"No active weather alerts for {state.upper()}."
+    )
 
 
 @mcp.tool()
@@ -86,21 +90,30 @@ async def get_forecast(latitude: float, longitude: float) -> str:
         latitude: Latitude of the location (e.g., 38.8951).
         longitude: Longitude of the location (e.g., -77.0364).
     """
-    logger.info(
-        f"Executing get_forecast for lat: {latitude}, lon: {longitude}")
-    if not isinstance(latitude, (int, float)) or not isinstance(longitude, (int, float)):
+    logger.info(f"Executing get_forecast for lat: {latitude}, lon: {longitude}")
+    if not isinstance(latitude, (int, float)) or not isinstance(
+        longitude, (int, float)
+    ):
         return "Invalid coordinates. Latitude and longitude must be numbers."
 
     points_url = f"{NWS_API_BASE}/points/{latitude},{longitude}"
     points_data = await make_nws_request(points_url)
 
-    if not points_data or "properties" not in points_data or "forecast" not in points_data["properties"]:
+    if (
+        not points_data
+        or "properties" not in points_data
+        or "forecast" not in points_data["properties"]
+    ):
         return "Unable to fetch forecast grid data for this location. Please ensure coordinates are within the US."
 
     forecast_url = points_data["properties"]["forecast"]
     forecast_data = await make_nws_request(forecast_url)
 
-    if not forecast_data or "properties" not in forecast_data or "periods" not in forecast_data["properties"]:
+    if (
+        not forecast_data
+        or "properties" not in forecast_data
+        or "periods" not in forecast_data["properties"]
+    ):
         return "Unable to fetch detailed forecast for this location."
 
     periods = forecast_data["properties"]["periods"]
@@ -120,7 +133,8 @@ Forecast: {period.get('detailedForecast', 'No detailed forecast available.')}
     logger.info(f"Generated forecast for {latitude}, {longitude}")
     return "\n---\n".join(forecasts)
 
+
 if __name__ == "__main__":
     logger.info("Starting MCP weather server...")
-    mcp.run(transport='stdio')
+    mcp.run(transport="stdio")
     logger.info("MCP weather server stopped.")

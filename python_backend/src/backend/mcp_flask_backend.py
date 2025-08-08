@@ -1,19 +1,20 @@
 # python_backend/mcp_flask_backend.py
-from mcp_chat_app import MCPChatApp
-import sys
-import os
 import argparse
-from flask import Flask, request, jsonify
 import asyncio
-import threading
-import logging
 import json
+import logging
+import sys
+import threading
 from pathlib import Path
+
+from flask import Flask, jsonify, request
+from mcp_chat_app import MCPChatApp
 
 sys.path.insert(0, str(Path(__file__).parent.absolute()))
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 flask_app = Flask(__name__)
@@ -42,8 +43,7 @@ async def initialize_chat_app():
                 pass
             logger.info("MCPChatApp initialized successfully with Ollama backend.")
         except Exception as e:
-            logger.error(
-                f"Failed to initialize MCPChatApp: {e}", exc_info=True)
+            logger.error(f"Failed to initialize MCPChatApp: {e}", exc_info=True)
             # Don't set chat_app to None - keep it for later initialization
             logger.warning("Chat app created but not fully initialized")
     return chat_app
@@ -58,46 +58,52 @@ async def load_default_servers():
         return
 
     # Look for mcp_servers.json in the python_backend directory
-    config_path = Path(__file__).parent.parent.parent / 'mcp_servers.json'
+    config_path = Path(__file__).parent.parent.parent / "mcp_servers.json"
 
     if not config_path.exists():
         logger.info(f"No default server configuration found at {config_path}")
         return
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = json.load(f)
 
-        if not config or 'mcpServers' not in config:
+        if not config or "mcpServers" not in config:
             logger.warning("Invalid configuration format in mcp_servers.json")
             return
 
-        servers = config['mcpServers']
+        servers = config["mcpServers"]
         loaded_count = 0
 
         for server_name, server_config in servers.items():
             # Skip disabled servers
-            if server_config.get('disabled', False):
+            if server_config.get("disabled", False):
                 logger.info(f"Skipping disabled server: {server_name}")
                 continue
 
-            if not server_config.get('command') or not server_config.get('args'):
-                logger.warning(f"Invalid server config for {server_name}: missing command or args")
+            if not server_config.get("command") or not server_config.get("args"):
+                logger.warning(
+                    f"Invalid server config for {server_name}: missing command or args"
+                )
                 continue
 
             try:
                 # Get environment variables if specified
-                env_vars = server_config.get('env', {})
+                env_vars = server_config.get("env", {})
                 if env_vars:
-                    logger.info(f"Passing environment variables to server {server_name}: {list(env_vars.keys())}")
+                    logger.info(
+                        f"Passing environment variables to server {server_name}: {list(env_vars.keys())}"
+                    )
 
                 added_tools = await app.connect_to_mcp_server(
                     name=server_name,
-                    command=server_config['command'],
-                    args=server_config['args'],
-                    env=env_vars
+                    command=server_config["command"],
+                    args=server_config["args"],
+                    env=env_vars,
                 )
-                logger.info(f"Successfully loaded default server '{server_name}' with {len(added_tools)} tools")
+                logger.info(
+                    f"Successfully loaded default server '{server_name}' with {len(added_tools)} tools"
+                )
                 loaded_count += 1
 
             except Exception as e:
@@ -109,7 +115,9 @@ async def load_default_servers():
             logger.info("No default servers were loaded")
 
     except Exception as e:
-        logger.error(f"Error loading default servers from {config_path}: {e}", exc_info=True)
+        logger.error(
+            f"Error loading default servers from {config_path}: {e}", exc_info=True
+        )
 
 
 async def add_server_async(path=None, name=None, command=None, args=None, env=None):
@@ -119,15 +127,26 @@ async def add_server_async(path=None, name=None, command=None, args=None, env=No
 
     identifier = path if path else name
     if not identifier:
-         return {"status": "error", "message": "Missing server identifier (path or name)"}, 400
+        return {
+            "status": "error",
+            "message": "Missing server identifier (path or name)",
+        }, 400
 
     try:
-        added_tools = await app.connect_to_mcp_server(path=path, name=name, command=command, args=args, env=env)
+        added_tools = await app.connect_to_mcp_server(
+            path=path, name=name, command=command, args=args, env=env
+        )
         server_display_name = Path(path).name if path else name
-        return {"status": "success", "message": f"Server '{server_display_name}' added.", "tools": added_tools}, 200
+        return {
+            "status": "success",
+            "message": f"Server '{server_display_name}' added.",
+            "tools": added_tools,
+        }, 200
     except FileNotFoundError as e:
         return {"status": "error", "message": str(e)}, 404
-    except ValueError as e: # Catches issues from connect_to_mcp_server like missing params
+    except (
+        ValueError
+    ) as e:  # Catches issues from connect_to_mcp_server like missing params
         return {"status": "error", "message": str(e)}, 400
     except Exception as e:
         logger.error(f"Error adding server {identifier}: {e}", exc_info=True)
@@ -140,11 +159,21 @@ async def disconnect_server_async(identifier):
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
         disconnected = await app.disconnect_mcp_server(identifier)
-        server_display_name = Path(identifier).name if '/' in identifier or '\\' in identifier else identifier
+        server_display_name = (
+            Path(identifier).name
+            if "/" in identifier or "\\" in identifier
+            else identifier
+        )
         if disconnected:
-            return {"status": "success", "message": f"Server '{server_display_name}' disconnected."}, 200
+            return {
+                "status": "success",
+                "message": f"Server '{server_display_name}' disconnected.",
+            }, 200
         else:
-            return {"status": "error", "message": f"Server '{server_display_name}' not found or already disconnected."}, 404
+            return {
+                "status": "error",
+                "message": f"Server '{server_display_name}' not found or already disconnected.",
+            }, 404
     except Exception as e:
         logger.error(f"Error disconnecting server {identifier}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to disconnect server: {e}"}, 500
@@ -180,18 +209,25 @@ async def disconnect_all_servers_async():
             return {
                 "status": "success",
                 "message": f"Successfully cleaned up {len(servers)} servers",
-                "servers_cleaned": [Path(s).name if '/' in s or '\\' in s else s for s in servers]
+                "servers_cleaned": [
+                    Path(s).name if "/" in s or "\\" in s else s for s in servers
+                ],
             }, 200
         else:
-            logger.warning("cleanup_all_servers() returned False - some errors occurred")
+            logger.warning(
+                "cleanup_all_servers() returned False - some errors occurred"
+            )
             return {
                 "status": "error",
-                "message": "Cleanup completed with some errors - check logs"
+                "message": "Cleanup completed with some errors - check logs",
             }, 500
 
     except Exception as e:
         logger.error(f"Error in disconnect_all_servers_async: {e}", exc_info=True)
-        return {"status": "error", "message": f"Failed to disconnect all servers: {e}"}, 500
+        return {
+            "status": "error",
+            "message": f"Failed to disconnect all servers: {e}",
+        }, 500
 
 
 async def get_servers_async():
@@ -201,13 +237,19 @@ async def get_servers_async():
     servers = []
     # Now iterating through identifiers (path or name)
     for identifier, resources in app.server_resources.items():
-        server_display_name = Path(identifier).name if '/' in identifier or '\\' in identifier else identifier
-        servers.append({
-            "identifier": identifier, # Send the unique ID
-            "display_name": server_display_name, # Send a user-friendly name
-            "tools": sorted(resources.get('tools', [])),
-            "status": resources.get('status', 'unknown')
-        })
+        server_display_name = (
+            Path(identifier).name
+            if "/" in identifier or "\\" in identifier
+            else identifier
+        )
+        servers.append(
+            {
+                "identifier": identifier,  # Send the unique ID
+                "display_name": server_display_name,  # Send a user-friendly name
+                "tools": sorted(resources.get("tools", [])),
+                "status": resources.get("status", "unknown"),
+            }
+        )
     return {"status": "success", "servers": servers}, 200
 
 
@@ -230,11 +272,14 @@ async def set_api_key_async(api_key):
     try:
         await app.set_api_key_and_reinitialize(api_key)
         backend = app.get_backend()
-        return {"status": "success", "message": f"API Key set for {backend} backend."}, 200
+        return {
+            "status": "success",
+            "message": f"API Key set for {backend} backend.",
+        }, 200
     except Exception as e:
-        logger.error(
-            f"Error setting API key: {e}", exc_info=True)
+        logger.error(f"Error setting API key: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set API key: {e}"}, 500
+
 
 # --- Model Switching Async Functions ---
 async def set_model_async(model_name):
@@ -245,13 +290,20 @@ async def set_model_async(model_name):
         success = await app.set_model_async(model_name)
         if success:
             backend = app.get_backend()
-            return {"status": "success", "message": f"Model set to {model_name} for {backend} backend."}, 200
+            return {
+                "status": "success",
+                "message": f"Model set to {model_name} for {backend} backend.",
+            }, 200
         else:
             available_models = await app.list_available_models()
-            return {"status": "error", "message": f"Invalid model: {model_name}. Available: {', '.join(available_models)}"}, 400
+            return {
+                "status": "error",
+                "message": f"Invalid model: {model_name}. Available: {', '.join(available_models)}",
+            }, 400
     except Exception as e:
         logger.error(f"Error setting model to {model_name}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set model: {e}"}, 500
+
 
 async def get_model_async():
     app = await initialize_chat_app()
@@ -263,6 +315,7 @@ async def get_model_async():
     except Exception as e:
         logger.error(f"Error getting current model: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to get model: {e}"}, 500
+
 
 async def list_models_async():
     app = await initialize_chat_app()
@@ -281,7 +334,10 @@ async def list_models_async():
     except Exception as e:
         logger.error(f"Error listing available models: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to list models: {e}"}, 500
+
+
 # --- End Model Switching Async Functions ---
+
 
 # --- Backend Management Async Functions ---
 async def set_backend_async(backend_type):
@@ -291,12 +347,19 @@ async def set_backend_async(backend_type):
     try:
         success = app.set_backend(backend_type)
         if success:
-            return {"status": "success", "message": f"Backend set to {backend_type}"}, 200
+            return {
+                "status": "success",
+                "message": f"Backend set to {backend_type}",
+            }, 200
         else:
-            return {"status": "error", "message": f"Invalid backend type: {backend_type}"}, 400
+            return {
+                "status": "error",
+                "message": f"Invalid backend type: {backend_type}",
+            }, 400
     except Exception as e:
         logger.error(f"Error setting backend to {backend_type}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set backend: {e}"}, 500
+
 
 async def get_backend_async():
     app = await initialize_chat_app()
@@ -309,6 +372,7 @@ async def get_backend_async():
         logger.error(f"Error getting backend: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to get backend: {e}"}, 500
 
+
 async def validate_backend_async():
     app = await initialize_chat_app()
     if not app:
@@ -320,6 +384,7 @@ async def validate_backend_async():
         logger.error(f"Error validating backend: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to validate backend: {e}"}, 500
 
+
 async def clear_history_async():
     app = await initialize_chat_app()
     if not app:
@@ -329,20 +394,25 @@ async def clear_history_async():
         return {"status": "success", "message": "Conversation history cleared"}, 200
     except Exception as e:
         logger.error(f"Error clearing conversation history: {e}", exc_info=True)
-        return {"status": "error", "message": f"Failed to clear conversation history: {e}"}, 500
+        return {
+            "status": "error",
+            "message": f"Failed to clear conversation history: {e}",
+        }, 500
+
+
 # --- End Backend Management Async Functions ---
 
-@flask_app.route('/chat', methods=['POST'])
+
+@flask_app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
-    message = data.get('message')
+    message = data.get("message")
     if not message:
         return jsonify({"reply": "No message provided."}), 400
     if not loop or not loop.is_running():
         return jsonify({"reply": "Backend loop not running."}), 500
 
-    future = asyncio.run_coroutine_threadsafe(
-        process_chat_async(message), loop)
+    future = asyncio.run_coroutine_threadsafe(process_chat_async(message), loop)
     try:
         result, status_code = future.result(timeout=60)
         return jsonify(result), status_code
@@ -350,70 +420,105 @@ def chat():
         logger.error("Chat processing timed out.")
         return jsonify({"reply": "Error: Response timed out."}), 504
     except Exception as e:
-        logger.error(
-            f"Error getting result from chat future: {e}", exc_info=True)
+        logger.error(f"Error getting result from chat future: {e}", exc_info=True)
         return jsonify({"reply": f"Error processing your request: {e}"}), 500
 
 
-@flask_app.route('/servers', methods=['POST'])
+@flask_app.route("/servers", methods=["POST"])
 def add_server():
     data = request.get_json()
-    path = data.get('path')
-    name = data.get('name')
-    command = data.get('command')
-    args = data.get('args') # Expecting a list
-    env = data.get('env', {}) # Expecting a dict
+    path = data.get("path")
+    name = data.get("name")
+    command = data.get("command")
+    args = data.get("args")  # Expecting a list
+    env = data.get("env", {})  # Expecting a dict
 
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
 
     if path:
         # Adding via Python script path
-        future = asyncio.run_coroutine_threadsafe(add_server_async(path=path, env=env), loop)
+        future = asyncio.run_coroutine_threadsafe(
+            add_server_async(path=path, env=env), loop
+        )
         identifier_log = path
     elif name and command and isinstance(args, list):
         # Adding via command/args (e.g., from JSON)
-        future = asyncio.run_coroutine_threadsafe(add_server_async(name=name, command=command, args=args, env=env), loop)
+        future = asyncio.run_coroutine_threadsafe(
+            add_server_async(name=name, command=command, args=args, env=env), loop
+        )
         identifier_log = name
     else:
-        return jsonify({"status": "error", "message": "Invalid parameters. Provide either 'path' or 'name', 'command', and 'args'."}), 400
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Invalid parameters. Provide either 'path' or 'name', 'command', and 'args'.",
+                }
+            ),
+            400,
+        )
 
     try:
         result, status_code = future.result(timeout=30)
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error(f"Adding server {identifier_log} timed out.")
-        return jsonify({"status": "error", "message": "Error: Adding server timed out."}), 504
+        return (
+            jsonify({"status": "error", "message": "Error: Adding server timed out."}),
+            504,
+        )
     except Exception as e:
         logger.error(
-            f"Error getting result from add_server future for {identifier_log}: {e}", exc_info=True)
+            f"Error getting result from add_server future for {identifier_log}: {e}",
+            exc_info=True,
+        )
         return jsonify({"status": "error", "message": f"Error adding server: {e}"}), 500
 
 
-@flask_app.route('/servers', methods=['DELETE'])
+@flask_app.route("/servers", methods=["DELETE"])
 def delete_server():
     data = request.get_json()
-    identifier = data.get('identifier') # Expect 'identifier' instead of 'path'
+    identifier = data.get("identifier")  # Expect 'identifier' instead of 'path'
     if not identifier:
-        return jsonify({"status": "error", "message": "No server identifier provided for deletion."}), 400
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "No server identifier provided for deletion.",
+                }
+            ),
+            400,
+        )
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
 
     future = asyncio.run_coroutine_threadsafe(
-        disconnect_server_async(identifier), loop) # Pass identifier
+        disconnect_server_async(identifier), loop
+    )  # Pass identifier
     try:
         result, status_code = future.result(timeout=30)
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error(f"Disconnecting server {identifier} timed out.")
-        return jsonify({"status": "error", "message": "Error: Disconnecting server timed out."}), 504
+        return (
+            jsonify(
+                {"status": "error", "message": "Error: Disconnecting server timed out."}
+            ),
+            504,
+        )
     except Exception as e:
         logger.error(
-            f"Error getting result from delete_server future for {identifier}: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error disconnecting server: {e}"}), 500
+            f"Error getting result from delete_server future for {identifier}: {e}",
+            exc_info=True,
+        )
+        return (
+            jsonify({"status": "error", "message": f"Error disconnecting server: {e}"}),
+            500,
+        )
 
 
-@flask_app.route('/servers', methods=['GET'])
+@flask_app.route("/servers", methods=["GET"])
 def get_servers():
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
@@ -424,14 +529,23 @@ def get_servers():
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error("Getting servers timed out.")
-        return jsonify({"status": "error", "message": "Error: Getting server list timed out."}), 504
+        return (
+            jsonify(
+                {"status": "error", "message": "Error: Getting server list timed out."}
+            ),
+            504,
+        )
     except Exception as e:
         logger.error(
-            f"Error getting result from get_servers future: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error getting servers: {e}"}), 500
+            f"Error getting result from get_servers future: {e}", exc_info=True
+        )
+        return (
+            jsonify({"status": "error", "message": f"Error getting servers: {e}"}),
+            500,
+        )
 
 
-@flask_app.route('/disconnect-all-servers', methods=['POST'])
+@flask_app.route("/disconnect-all-servers", methods=["POST"])
 def disconnect_all_servers():
     """Disconnect all MCP servers for clean shutdown"""
     logger.info("Received request to disconnect all servers")
@@ -443,21 +557,38 @@ def disconnect_all_servers():
     logger.info("Submitting disconnect_all_servers_async to event loop")
     future = asyncio.run_coroutine_threadsafe(disconnect_all_servers_async(), loop)
     try:
-        result, status_code = future.result(timeout=30)  # Longer timeout for multiple disconnections
-        logger.info(f"disconnect_all_servers_async completed with status {status_code}: {result}")
+        result, status_code = future.result(
+            timeout=30
+        )  # Longer timeout for multiple disconnections
+        logger.info(
+            f"disconnect_all_servers_async completed with status {status_code}: {result}"
+        )
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error("Disconnecting all servers timed out.")
-        return jsonify({"status": "error", "message": "Error: Disconnecting all servers timed out."}), 504
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Error: Disconnecting all servers timed out.",
+                }
+            ),
+            504,
+        )
     except Exception as e:
         logger.error(f"Error disconnecting all servers: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error disconnecting all servers: {e}"}), 500
+        return (
+            jsonify(
+                {"status": "error", "message": f"Error disconnecting all servers: {e}"}
+            ),
+            500,
+        )
 
 
-@flask_app.route('/set-api-key', methods=['POST'])
+@flask_app.route("/set-api-key", methods=["POST"])
 def set_api_key():
     data = request.get_json()
-    api_key = data.get('apiKey')
+    api_key = data.get("apiKey")
     if not api_key:
         return jsonify({"status": "error", "message": "No API key provided."}), 400
     if not loop or not loop.is_running():
@@ -465,22 +596,31 @@ def set_api_key():
 
     future = asyncio.run_coroutine_threadsafe(set_api_key_async(api_key), loop)
     try:
-        result, status_code = future.result(
-            timeout=20)  # Timeout for re-initialization
+        result, status_code = future.result(timeout=20)  # Timeout for re-initialization
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error("Setting API key timed out.")
-        return jsonify({"status": "error", "message": "Error: Setting API key timed out."}), 504
+        return (
+            jsonify(
+                {"status": "error", "message": "Error: Setting API key timed out."}
+            ),
+            504,
+        )
     except Exception as e:
         logger.error(
-            f"Error getting result from set_api_key future: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error setting API key: {e}"}), 500
+            f"Error getting result from set_api_key future: {e}", exc_info=True
+        )
+        return (
+            jsonify({"status": "error", "message": f"Error setting API key: {e}"}),
+            500,
+        )
+
 
 # --- Model Switching Endpoints ---
-@flask_app.route('/set-model', methods=['POST'])
+@flask_app.route("/set-model", methods=["POST"])
 def set_model():
     data = request.get_json()
-    model_name = data.get('model')
+    model_name = data.get("model")
     if not model_name:
         return jsonify({"status": "error", "message": "No model name provided."}), 400
     if not loop or not loop.is_running():
@@ -492,12 +632,16 @@ def set_model():
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error(f"Setting model to {model_name} timed out.")
-        return jsonify({"status": "error", "message": "Error: Setting model timed out."}), 504
+        return (
+            jsonify({"status": "error", "message": "Error: Setting model timed out."}),
+            504,
+        )
     except Exception as e:
         logger.error(f"Error getting result from set_model future: {e}", exc_info=True)
         return jsonify({"status": "error", "message": f"Error setting model: {e}"}), 500
 
-@flask_app.route('/get-model', methods=['GET'])
+
+@flask_app.route("/get-model", methods=["GET"])
 def get_model():
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
@@ -508,12 +652,26 @@ def get_model():
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error("Getting current model timed out.")
-        return jsonify({"status": "error", "message": "Error: Getting current model timed out."}), 504
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Error: Getting current model timed out.",
+                }
+            ),
+            504,
+        )
     except Exception as e:
         logger.error(f"Error getting result from get_model future: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error getting current model: {e}"}), 500
+        return (
+            jsonify(
+                {"status": "error", "message": f"Error getting current model: {e}"}
+            ),
+            500,
+        )
 
-@flask_app.route('/list-models', methods=['GET'])
+
+@flask_app.route("/list-models", methods=["GET"])
 def list_models():
     if not loop or not loop.is_running():
         # Allow listing even if loop isn't fully ready, as list may be available
@@ -527,10 +685,20 @@ def list_models():
             return jsonify(result), status_code
         except asyncio.TimeoutError:
             logger.error("Listing models timed out.")
-            return jsonify({"status": "error", "message": "Error: Listing models timed out."}), 504
+            return (
+                jsonify(
+                    {"status": "error", "message": "Error: Listing models timed out."}
+                ),
+                504,
+            )
         except Exception as e:
-            logger.error(f"Error getting result from list_models future: {e}", exc_info=True)
-            return jsonify({"status": "error", "message": f"Error listing models: {e}"}), 500
+            logger.error(
+                f"Error getting result from list_models future: {e}", exc_info=True
+            )
+            return (
+                jsonify({"status": "error", "message": f"Error listing models: {e}"}),
+                500,
+            )
     else:
         # Fallback for when loop isn't running (e.g., during startup errors)
         try:
@@ -539,14 +707,20 @@ def list_models():
             return jsonify({"status": "success", "models": models}), 200
         except Exception as e:
             logger.error(f"Error listing models directly (no loop): {e}", exc_info=True)
-            return jsonify({"status": "error", "message": f"Error listing models: {e}"}), 500
+            return (
+                jsonify({"status": "error", "message": f"Error listing models: {e}"}),
+                500,
+            )
+
+
 # --- End Model Switching Endpoints ---
 
+
 # --- Backend Management Endpoints ---
-@flask_app.route('/set-backend', methods=['POST'])
+@flask_app.route("/set-backend", methods=["POST"])
 def set_backend():
     data = request.get_json()
-    backend_type = data.get('backend')
+    backend_type = data.get("backend")
     if not backend_type:
         return jsonify({"status": "error", "message": "No backend type provided."}), 400
     if not loop or not loop.is_running():
@@ -558,12 +732,23 @@ def set_backend():
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error(f"Setting backend to {backend_type} timed out.")
-        return jsonify({"status": "error", "message": "Error: Setting backend timed out."}), 504
+        return (
+            jsonify(
+                {"status": "error", "message": "Error: Setting backend timed out."}
+            ),
+            504,
+        )
     except Exception as e:
-        logger.error(f"Error getting result from set_backend future: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error setting backend: {e}"}), 500
+        logger.error(
+            f"Error getting result from set_backend future: {e}", exc_info=True
+        )
+        return (
+            jsonify({"status": "error", "message": f"Error setting backend: {e}"}),
+            500,
+        )
 
-@flask_app.route('/get-backend', methods=['GET'])
+
+@flask_app.route("/get-backend", methods=["GET"])
 def get_backend():
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
@@ -574,12 +759,23 @@ def get_backend():
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error("Getting backend timed out.")
-        return jsonify({"status": "error", "message": "Error: Getting backend timed out."}), 504
+        return (
+            jsonify(
+                {"status": "error", "message": "Error: Getting backend timed out."}
+            ),
+            504,
+        )
     except Exception as e:
-        logger.error(f"Error getting result from get_backend future: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error getting backend: {e}"}), 500
+        logger.error(
+            f"Error getting result from get_backend future: {e}", exc_info=True
+        )
+        return (
+            jsonify({"status": "error", "message": f"Error getting backend: {e}"}),
+            500,
+        )
 
-@flask_app.route('/validate-backend', methods=['GET'])
+
+@flask_app.route("/validate-backend", methods=["GET"])
 def validate_backend():
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
@@ -590,12 +786,23 @@ def validate_backend():
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error("Validating backend timed out.")
-        return jsonify({"status": "error", "message": "Error: Validating backend timed out."}), 504
+        return (
+            jsonify(
+                {"status": "error", "message": "Error: Validating backend timed out."}
+            ),
+            504,
+        )
     except Exception as e:
-        logger.error(f"Error getting result from validate_backend future: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error validating backend: {e}"}), 500
+        logger.error(
+            f"Error getting result from validate_backend future: {e}", exc_info=True
+        )
+        return (
+            jsonify({"status": "error", "message": f"Error validating backend: {e}"}),
+            500,
+        )
 
-@flask_app.route('/clear-history', methods=['POST'])
+
+@flask_app.route("/clear-history", methods=["POST"])
 def clear_history():
     if not loop or not loop.is_running():
         return jsonify({"status": "error", "message": "Backend loop not running."}), 500
@@ -606,14 +813,35 @@ def clear_history():
         return jsonify(result), status_code
     except asyncio.TimeoutError:
         logger.error("Clearing conversation history timed out.")
-        return jsonify({"status": "error", "message": "Error: Clearing conversation history timed out."}), 504
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Error: Clearing conversation history timed out.",
+                }
+            ),
+            504,
+        )
     except Exception as e:
-        logger.error(f"Error getting result from clear_history future: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": f"Error clearing conversation history: {e}"}), 500
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='MCP Multi-Backend Flask Server')
-    parser.add_argument('--port', type=int, default=5001,
-                        help='Port to run the backend on')
+        logger.error(
+            f"Error getting result from clear_history future: {e}", exc_info=True
+        )
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": f"Error clearing conversation history: {e}",
+                }
+            ),
+            500,
+        )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="MCP Multi-Backend Flask Server")
+    parser.add_argument(
+        "--port", type=int, default=5001, help="Port to run the backend on"
+    )
     args = parser.parse_args()
 
     thread = threading.Thread(target=start_async_loop, daemon=True)
@@ -624,46 +852,51 @@ if __name__ == '__main__':
         sys.exit(1)
 
     try:
-            init_future = asyncio.run_coroutine_threadsafe(
-                initialize_chat_app(), loop)
+        init_future = asyncio.run_coroutine_threadsafe(initialize_chat_app(), loop)
+        try:
+            init_future.result(timeout=20)
+            if chat_app is None:
+                logger.error("Chat app initialization returned None.")
+                sys.exit(1)
+            logger.info(
+                "Chat app initialized successfully via asyncio loop with Ollama backend."
+            )
+
+            # Load default servers from mcp_servers.json BEFORE starting Flask
+            load_servers_future = asyncio.run_coroutine_threadsafe(
+                load_default_servers(), loop
+            )
             try:
-                init_future.result(timeout=20)
-                if chat_app is None:
-                    logger.error("Chat app initialization returned None.")
-                    sys.exit(1)
-                logger.info("Chat app initialized successfully via asyncio loop with Ollama backend.")
-
-                # Load default servers from mcp_servers.json BEFORE starting Flask
-                load_servers_future = asyncio.run_coroutine_threadsafe(
-                    load_default_servers(), loop)
-                try:
-                    load_servers_future.result(timeout=30)
-                    logger.info("Default servers loading completed.")
-                except Exception as e:
-                    logger.error(f"Error loading default servers: {e}", exc_info=True)
-                    # Don't exit - the app can still work without default servers
-
+                load_servers_future.result(timeout=30)
+                logger.info("Default servers loading completed.")
             except Exception as e:
-                logger.error(
-                    f"Error during chat app initialization: {e}", exc_info=True)
-                # Don't exit if init fails due to no key, allow setting it later
-                logger.warning(
-                    "Initial backend initialization failed. Backend can be configured later via API.")
-                # Ensure we have a chat_app instance even if init fails
+                logger.error(f"Error loading default servers: {e}", exc_info=True)
+                # Don't exit - the app can still work without default servers
+
+        except Exception as e:
+            logger.error(f"Error during chat app initialization: {e}", exc_info=True)
+            # Don't exit if init fails due to no key, allow setting it later
+            logger.warning(
+                "Initial backend initialization failed. Backend can be configured later via API."
+            )
+            # Ensure we have a chat_app instance even if init fails
+            if chat_app is None:
+                loop_for_init = asyncio.run_coroutine_threadsafe(
+                    initialize_chat_app(), loop
+                )
+                try:
+                    loop_for_init.result(timeout=5)
+                except:
+                    pass  # Ignore errors, we'll create manually
                 if chat_app is None:
-                    loop_for_init = asyncio.run_coroutine_threadsafe(
-                        initialize_chat_app(), loop)
-                    try:
-                        loop_for_init.result(timeout=5)
-                    except:
-                        pass  # Ignore errors, we'll create manually
-                    if chat_app is None:
-                        chat_app = MCPChatApp()
-                        logger.info("Created MCPChatApp instance with Ollama backend despite initialization failure.")
+                    chat_app = MCPChatApp()
+                    logger.info(
+                        "Created MCPChatApp instance with Ollama backend despite initialization failure."
+                    )
 
     except:
         logger.error("Asyncio loop not available after waiting.")
         sys.exit(1)
 
     logger.info(f"Starting Flask server on 127.0.0.1:{args.port}")
-    flask_app.run(host='127.0.0.1', port=args.port)
+    flask_app.run(host="127.0.0.1", port=args.port)

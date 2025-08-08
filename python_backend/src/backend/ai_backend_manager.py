@@ -1,15 +1,15 @@
 # ai_backend_manager.py
-import asyncio
 import json
 import logging
 import os
-from typing import List, Dict, Any, Optional, Union
-from contextlib import asynccontextmanager
+from typing import Any, Dict, List
+
 import litellm
-from litellm import acompletion, completion
 import requests
+from litellm import acompletion, completion
 
 logger = logging.getLogger(__name__)
+
 
 class AIBackendManager:
     """Manages multiple AI backends using LiteLLM for unified interface."""
@@ -29,19 +29,19 @@ class AIBackendManager:
                     "gemini-1.5-pro-latest",
                     "gemini-2.0-flash",
                     "gemini-exp-1206",
-                ]
+                ],
             },
             "ollama": {
                 "default_model": "qwen3:30b",
                 "requires_api_key": False,
                 "base_url": "http://localhost:11434",
-                "models": []  # Will be fetched dynamically
+                "models": [],  # Will be fetched dynamically
             },
             "mlx": {
                 "default_model": "baidu/ERNIE-4.5-0.3B-PT",
                 "requires_api_key": False,
                 "base_url": "http://localhost:8081",  # Default MLX OpenAI-compatible server
-                "models": []  # Will be fetched dynamically
+                "models": [],  # Will be fetched dynamically
             },
             "openai": {
                 "default_model": "gpt-4o-mini",
@@ -51,12 +51,14 @@ class AIBackendManager:
                     "gpt-4o-mini",
                     "gpt-4-turbo",
                     "gpt-3.5-turbo",
-                ]
-            }
+                ],
+            },
         }
 
         # Initialize current model to backend's default
-        self.current_model = self.backend_settings[self.current_backend]["default_model"]
+        self.current_model = self.backend_settings[self.current_backend][
+            "default_model"
+        ]
 
         # Configure LiteLLM
         litellm.set_verbose = False  # Set to True for debugging
@@ -68,7 +70,9 @@ class AIBackendManager:
             return False
 
         if backend_type != self.current_backend:
-            logger.info(f"Switching backend from {self.current_backend} to {backend_type}")
+            logger.info(
+                f"Switching backend from {self.current_backend} to {backend_type}"
+            )
             self.current_backend = backend_type
             # Set default model for the new backend
             self.current_model = self.backend_settings[backend_type]["default_model"]
@@ -88,11 +92,15 @@ class AIBackendManager:
         # For static model lists (Gemini, OpenAI), check immediately
         if backend_config["models"]:
             if model_name not in backend_config["models"]:
-                logger.error(f"Model {model_name} not available for backend {self.current_backend}")
+                logger.error(
+                    f"Model {model_name} not available for backend {self.current_backend}"
+                )
                 return False
         # For dynamic backends (Ollama, MLX), we'll allow the model and validate later
         else:
-            logger.info(f"Setting model {model_name} for {self.current_backend} (will validate dynamically)")
+            logger.info(
+                f"Setting model {model_name} for {self.current_backend} (will validate dynamically)"
+            )
 
         self.current_model = model_name
         logger.info(f"Set model to {model_name} for backend {self.current_backend}")
@@ -102,7 +110,9 @@ class AIBackendManager:
         """Async version of set_model that can validate against dynamic model lists."""
         available_models = await self.list_models()
         if model_name not in available_models:
-            logger.error(f"Model {model_name} not available for backend {self.current_backend}")
+            logger.error(
+                f"Model {model_name} not available for backend {self.current_backend}"
+            )
             return False
 
         self.current_model = model_name
@@ -214,7 +224,13 @@ class AIBackendManager:
 
         return kwargs
 
-    async def chat_async(self, message: str, system_prompt: str = None, tools: List[Dict] = None, image_data=None) -> str:
+    async def chat_async(
+        self,
+        message: str,
+        system_prompt: str = None,
+        tools: List[Dict] = None,
+        image_data=None,
+    ) -> str:
         """Send a chat message to the current backend and return the response."""
         try:
             # Prepare messages
@@ -228,15 +244,19 @@ class AIBackendManager:
                 user_content = [{"type": "text", "text": message}]
 
                 # Add image content
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{image_data['mimeType']};base64,{image_data['data']}"
+                user_content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{image_data['mimeType']};base64,{image_data['data']}"
+                        },
                     }
-                })
+                )
 
                 messages.append({"role": "user", "content": user_content})
-                logger.info(f"Adding image to request: {image_data.get('name', 'unknown')}")
+                logger.info(
+                    f"Adding image to request: {image_data.get('name', 'unknown')}"
+                )
             else:
                 messages.append({"role": "user", "content": message})
 
@@ -249,14 +269,12 @@ class AIBackendManager:
                 kwargs["tools"] = tools
                 kwargs["tool_choice"] = "auto"
 
-            logger.info(f"Sending chat request to {self.current_backend} with model {self.current_model}")
+            logger.info(
+                f"Sending chat request to {self.current_backend} with model {self.current_model}"
+            )
 
             # Make async completion call
-            response = await acompletion(
-                model=model_name,
-                messages=messages,
-                **kwargs
-            )
+            response = await acompletion(model=model_name, messages=messages, **kwargs)
 
             # Extract response content
             if response.choices and response.choices[0].message:
@@ -265,15 +283,24 @@ class AIBackendManager:
                     return content
 
                 # Handle tool calls if present
-                if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls:
+                if (
+                    hasattr(response.choices[0].message, "tool_calls")
+                    and response.choices[0].message.tool_calls
+                ):
                     tool_calls = response.choices[0].message.tool_calls
-                    return json.dumps([{
-                        "id": tc.id,
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
-                        }
-                    } for tc in tool_calls], indent=2)
+                    return json.dumps(
+                        [
+                            {
+                                "id": tc.id,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
+                            }
+                            for tc in tool_calls
+                        ],
+                        indent=2,
+                    )
 
             return "No response received from the model."
 
@@ -281,7 +308,9 @@ class AIBackendManager:
             logger.error(f"Error in chat_async with {self.current_backend}: {e}")
             raise
 
-    def chat_sync(self, message: str, system_prompt: str = None, tools: List[Dict] = None) -> str:
+    def chat_sync(
+        self, message: str, system_prompt: str = None, tools: List[Dict] = None
+    ) -> str:
         """Synchronous chat method."""
         try:
             # Prepare messages
@@ -299,14 +328,12 @@ class AIBackendManager:
                 kwargs["tools"] = tools
                 kwargs["tool_choice"] = "auto"
 
-            logger.info(f"Sending sync chat request to {self.current_backend} with model {self.current_model}")
+            logger.info(
+                f"Sending sync chat request to {self.current_backend} with model {self.current_model}"
+            )
 
             # Make completion call
-            response = completion(
-                model=model_name,
-                messages=messages,
-                **kwargs
-            )
+            response = completion(model=model_name, messages=messages, **kwargs)
 
             # Extract response content
             if response.choices and response.choices[0].message:
@@ -315,15 +342,24 @@ class AIBackendManager:
                     return content
 
                 # Handle tool calls if present
-                if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls:
+                if (
+                    hasattr(response.choices[0].message, "tool_calls")
+                    and response.choices[0].message.tool_calls
+                ):
                     tool_calls = response.choices[0].message.tool_calls
-                    return json.dumps([{
-                        "id": tc.id,
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
-                        }
-                    } for tc in tool_calls], indent=2)
+                    return json.dumps(
+                        [
+                            {
+                                "id": tc.id,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
+                            }
+                            for tc in tool_calls
+                        ],
+                        indent=2,
+                    )
 
             return "No response received from the model."
 
@@ -337,7 +373,7 @@ class AIBackendManager:
             "backend": self.current_backend,
             "model": self.current_model,
             "valid": True,
-            "issues": []
+            "issues": [],
         }
 
         backend_config = self.backend_settings[self.current_backend]
@@ -352,20 +388,30 @@ class AIBackendManager:
 
             if not has_key:
                 result["valid"] = False
-                result["issues"].append(f"API key required for {self.current_backend} backend")
+                result["issues"].append(
+                    f"API key required for {self.current_backend} backend"
+                )
 
         # Check if local service is accessible for local backends
         if self.current_backend in ["ollama", "mlx"]:
             base_url = backend_config.get("base_url")
             if base_url:
                 try:
-                    health_url = f"{base_url}/api/tags" if self.current_backend == "ollama" else f"{base_url}/v1/models"
+                    health_url = (
+                        f"{base_url}/api/tags"
+                        if self.current_backend == "ollama"
+                        else f"{base_url}/v1/models"
+                    )
                     response = requests.get(health_url, timeout=3)
                     if response.status_code != 200:
                         result["valid"] = False
-                        result["issues"].append(f"{self.current_backend} service not accessible at {base_url}")
+                        result["issues"].append(
+                            f"{self.current_backend} service not accessible at {base_url}"
+                        )
                 except Exception as e:
                     result["valid"] = False
-                    result["issues"].append(f"{self.current_backend} service not accessible: {str(e)}")
+                    result["issues"].append(
+                        f"{self.current_backend} service not accessible: {str(e)}"
+                    )
 
         return result
