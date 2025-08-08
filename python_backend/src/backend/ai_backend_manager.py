@@ -32,7 +32,7 @@ class AIBackendManager:
                 ],
             },
             "ollama": {
-                "default_model": "qwen3:30b",
+                "default_model": "qwen3:0.6b",
                 "requires_api_key": False,
                 "base_url": "http://localhost:11434",
                 "models": [],  # Will be fetched dynamically
