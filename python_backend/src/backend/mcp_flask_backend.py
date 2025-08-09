@@ -8,7 +8,11 @@ import threading
 from pathlib import Path
 
 from flask import Flask, jsonify, request
-from .mcp_chat_app import MCPChatApp
+try:
+    from .mcp_chat_app import MCPChatApp
+except ImportError:
+    # For direct execution
+    from mcp_chat_app import MCPChatApp
 
 sys.path.insert(0, str(Path(__file__).parent.absolute()))
 

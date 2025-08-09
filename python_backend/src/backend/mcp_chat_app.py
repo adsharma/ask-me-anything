@@ -7,8 +7,13 @@ import sys
 from contextlib import AsyncExitStack
 from typing import Any, Dict, List, Optional, Tuple
 
-from .ai_backend_manager import AIBackendManager
-from .conversation_db import ConversationDB
+try:
+    from .ai_backend_manager import AIBackendManager
+    from .conversation_db import ConversationDB
+except ImportError:
+    # For direct execution  
+    from ai_backend_manager import AIBackendManager
+    from conversation_db import ConversationDB
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors as genai_errors
