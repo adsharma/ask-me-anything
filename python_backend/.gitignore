@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# User configuration files
+user_config.json

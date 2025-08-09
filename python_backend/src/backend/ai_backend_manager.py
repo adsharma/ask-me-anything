@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import litellm
 import requests
 from litellm import acompletion, completion
+from config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,12 @@ class AIBackendManager:
     """Manages multiple AI backends using LiteLLM for unified interface."""
 
     def __init__(self):
-        self.current_backend = "ollama"  # default to Ollama for local models
-        self.current_model = None
+        # Initialize configuration manager for persistence
+        self.config_manager = ConfigManager()
+        
+        # Load saved preferences or use defaults
+        self.current_backend = self.config_manager.get_backend()
+        self.current_model = self.config_manager.get_current_model()
         self.api_key = None
 
         # Backend-specific settings
@@ -53,15 +58,35 @@ class AIBackendManager:
                     "gpt-3.5-turbo",
                 ],
             },
+            "anthropic": {
+                "default_model": "claude-3-haiku-20240307",
+                "requires_api_key": True,
+                "models": [
+                    "claude-3-haiku-20240307",
+                    "claude-3-sonnet-20240229",
+                    "claude-3-opus-20240229",
+                ],
+            },
+            "cohere": {
+                "default_model": "command-r",
+                "requires_api_key": True,
+                "models": [
+                    "command-r",
+                    "command-r-plus",
+                ],
+            },
         }
 
-        # Initialize current model to backend's default
-        self.current_model = self.backend_settings[self.current_backend][
-            "default_model"
-        ]
+        # Initialize current model from config or use backend default
+        if not self.current_model:
+            self.current_model = self.backend_settings[self.current_backend]["default_model"]
+            # Save the default model to config for next time
+            self.config_manager.set_current_model(self.current_model)
 
         # Configure LiteLLM
         litellm.set_verbose = False  # Set to True for debugging
+        
+        logger.info(f"Initialized AIBackendManager with backend: {self.current_backend}, model: {self.current_model}")
 
     def set_backend(self, backend_type: str) -> bool:
         """Set the current backend type."""
@@ -74,9 +99,19 @@ class AIBackendManager:
                 f"Switching backend from {self.current_backend} to {backend_type}"
             )
             self.current_backend = backend_type
-            # Set default model for the new backend
-            self.current_model = self.backend_settings[backend_type]["default_model"]
-            logger.info(f"Set default model to {self.current_model}")
+            
+            # Get the saved model for this backend, or use default
+            saved_model = self.config_manager.get_model(backend_type)
+            if saved_model:
+                self.current_model = saved_model
+                logger.info(f"Restored saved model: {self.current_model}")
+            else:
+                # Set default model for the new backend
+                self.current_model = self.backend_settings[backend_type]["default_model"]
+                logger.info(f"Set default model to {self.current_model}")
+            
+            # Save the backend change to config
+            self.config_manager.set_backend(backend_type)
 
         return True
 
@@ -104,6 +139,10 @@ class AIBackendManager:
 
         self.current_model = model_name
         logger.info(f"Set model to {model_name} for backend {self.current_backend}")
+        
+        # Save the model selection to config
+        self.config_manager.set_model(self.current_backend, model_name)
+        
         return True
 
     async def set_model_async(self, model_name: str) -> bool:
@@ -117,6 +156,10 @@ class AIBackendManager:
 
         self.current_model = model_name
         logger.info(f"Set model to {model_name} for backend {self.current_backend}")
+        
+        # Save the model selection to config
+        self.config_manager.set_model(self.current_backend, model_name)
+        
         return True
 
     def get_model(self) -> str:
