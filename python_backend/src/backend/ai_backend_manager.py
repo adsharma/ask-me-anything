@@ -63,6 +63,42 @@ class AIBackendManager:
         # Configure LiteLLM
         litellm.set_verbose = False  # Set to True for debugging
 
+    async def detect_and_set_available_model(self) -> bool:
+        """Detect available models and set current_model to an available one.
+        
+        Returns:
+            bool: True if a valid model was found and set, False otherwise
+        """
+        if self.current_backend in ["ollama", "mlx"]:
+            # For local backends, check what models are actually available
+            try:
+                available_models = await self._fetch_local_models()
+                if available_models:
+                    current_default = self.backend_settings[self.current_backend]["default_model"]
+                    
+                    # If the current default model is available, keep it
+                    if current_default in available_models:
+                        self.current_model = current_default
+                        logger.info(f"Default model {current_default} is available, using it")
+                        return True
+                    
+                    # Otherwise, use the first available model
+                    self.current_model = available_models[0]
+                    logger.info(f"Default model {current_default} not available, using {self.current_model} instead")
+                    return True
+                else:
+                    logger.warning(f"No models found for {self.current_backend} backend")
+                    return False
+                    
+            except Exception as e:
+                logger.warning(f"Failed to detect available models for {self.current_backend}: {e}")
+                # Keep the default model as fallback
+                return False
+        else:
+            # For cloud backends (gemini, openai), use the predefined default
+            # since we can't query available models without API keys
+            return True
+
     def set_backend(self, backend_type: str) -> bool:
         """Set the current backend type."""
         if backend_type not in self.backend_settings:
@@ -78,6 +114,17 @@ class AIBackendManager:
             self.current_model = self.backend_settings[backend_type]["default_model"]
             logger.info(f"Set default model to {self.current_model}")
 
+        return True
+
+    async def set_backend_async(self, backend_type: str) -> bool:
+        """Async version that also detects available models for local backends."""
+        if not self.set_backend(backend_type):
+            return False
+            
+        # For local backends, try to detect and set an available model
+        if backend_type in ["ollama", "mlx"]:
+            await self.detect_and_set_available_model()
+            
         return True
 
     def get_backend(self) -> str:
@@ -408,6 +455,23 @@ class AIBackendManager:
                         result["issues"].append(
                             f"{self.current_backend} service not accessible at {base_url}"
                         )
+                    else:
+                        # Service is accessible, check if current model is actually available
+                        try:
+                            if self.current_backend == "ollama":
+                                data = response.json()
+                                available_models = [model["name"] for model in data.get("models", [])]
+                            else:  # mlx
+                                data = response.json()
+                                available_models = [model["id"] for model in data.get("data", [])]
+                            
+                            if available_models and self.current_model not in available_models:
+                                result["issues"].append(
+                                    f"Current model '{self.current_model}' not found among available models: {available_models[:3]}{'...' if len(available_models) > 3 else ''}"
+                                )
+                        except Exception as e:
+                            logger.warning(f"Could not verify model availability: {e}")
+                            
                 except Exception as e:
                     result["valid"] = False
                     result["issues"].append(

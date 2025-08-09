@@ -7,8 +7,8 @@ import sys
 from contextlib import AsyncExitStack
 from typing import Any, Dict, List, Optional, Tuple
 
-from ai_backend_manager import AIBackendManager
-from conversation_db import ConversationDB
+from .ai_backend_manager import AIBackendManager
+from .conversation_db import ConversationDB
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors as genai_errors
@@ -57,10 +57,29 @@ class MCPChatApp:
         self.status_check_task: Optional[asyncio.Task] = None
         self.api_key: Optional[str] = None
 
+    async def initialize_backend(self):
+        """Initialize the backend and detect available models for local backends."""
+        if self.ai_backend.get_backend() in ["ollama", "mlx"]:
+            # For local backends, try to detect and set an available model
+            try:
+                success = await self.ai_backend.detect_and_set_available_model()
+                if success:
+                    logger.info(f"Successfully initialized {self.ai_backend.get_backend()} backend with model {self.ai_backend.get_model()}")
+                else:
+                    logger.warning(f"Could not detect models for {self.ai_backend.get_backend()}, using default {self.ai_backend.get_model()}")
+            except Exception as e:
+                logger.error(f"Error during backend initialization: {e}")
+        else:
+            logger.info(f"Using {self.ai_backend.get_backend()} backend with default model {self.ai_backend.get_model()}")
+
     # Backend Management Methods
     def set_backend(self, backend_type: str) -> bool:
         """Set the AI backend type."""
         return self.ai_backend.set_backend(backend_type)
+
+    async def set_backend_async(self, backend_type: str) -> bool:
+        """Async version that also detects available models for local backends."""
+        return await self.ai_backend.set_backend_async(backend_type)
 
     def get_backend(self) -> str:
         """Get the current AI backend type."""

@@ -8,7 +8,7 @@ import threading
 from pathlib import Path
 
 from flask import Flask, jsonify, request
-from mcp_chat_app import MCPChatApp
+from .mcp_chat_app import MCPChatApp
 
 sys.path.insert(0, str(Path(__file__).parent.absolute()))
 
@@ -37,11 +37,12 @@ async def initialize_chat_app():
     if chat_app is None:
         chat_app = MCPChatApp()
         try:
-            # Try to initialize with default backend (Ollama)
+            # Initialize backend and detect available models
+            await chat_app.initialize_backend()
             if chat_app.requires_api_key():
-                # Ollama doesn't require an API key, so this won't execute
-                pass
-            logger.info("MCPChatApp initialized successfully with Ollama backend.")
+                # For backends that require API keys but don't have them set
+                logger.warning("Backend requires API key but none is set")
+            logger.info("MCPChatApp initialized successfully.")
         except Exception as e:
             logger.error(f"Failed to initialize MCPChatApp: {e}", exc_info=True)
             # Don't set chat_app to None - keep it for later initialization
@@ -344,11 +345,12 @@ async def set_backend_async(backend_type):
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
-        success = app.set_backend(backend_type)
+        success = await app.set_backend_async(backend_type)
         if success:
             return {
                 "status": "success",
                 "message": f"Backend set to {backend_type}",
+                "model": app.get_model()
             }, 200
         else:
             return {
