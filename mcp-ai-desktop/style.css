@@ -62,23 +62,6 @@ button, input, select, textarea {
   border: 1px solid var(--border-color);
 }
 
-.dark-mode-toggle {
-  -webkit-app-region: no-drag;
-  background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  border-radius: 4px;
-  cursor: pointer;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  font-size: 12px;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
 /* style.css */
 :root {
   --font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -216,6 +199,7 @@ body.dark .dark-mode-toggle:hover {
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  justify-content: space-between; /* Push toggle to the right */
 }
 
 .sidebar-header h2 {
