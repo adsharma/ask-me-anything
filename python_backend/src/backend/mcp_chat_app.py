@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from contextlib import AsyncExitStack
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ai_backend_manager import AIBackendManager
@@ -34,10 +35,8 @@ class MCPChatApp:
             self.ai_backend.set_model(model_name)
 
         # Initialize database for conversation history
-        db_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "..", "data", "chat_history.db"
-        )
-        self.conversation_db = ConversationDB(db_path)
+        db_path = Path(".").parent / "data" / "chat_history.db"
+        self.conversation_db = ConversationDB(str(db_path))
         self.current_conversation_id: Optional[int] = None
         self.session_id: Optional[str] = None
 
