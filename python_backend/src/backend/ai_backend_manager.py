@@ -67,7 +67,9 @@ class AIBackendManager:
                 available_models = self.list_models()
                 if available_models:
                     self.current_model = available_models[0]
-                    self.backend_settings[self.current_backend]["default_model"] = available_models[0]
+                    self.backend_settings[self.current_backend]["default_model"] = (
+                        available_models[0]
+                    )
                     logger.info(f"Set default model to {self.current_model}")
                 else:
                     logger.warning(f"No models available for {self.current_backend}")
@@ -77,7 +79,9 @@ class AIBackendManager:
                 logger.error(f"Error fetching {self.current_backend} models: {e}")
         else:
             # Settings define default for non-local backends
-            self.current_model = self.backend_settings[self.current_backend]["default_model"]
+            self.current_model = self.backend_settings[self.current_backend][
+                "default_model"
+            ]
             logger.info(f"Set default model to {self.current_model}")
 
     def set_backend(self, backend_type: str) -> bool:
