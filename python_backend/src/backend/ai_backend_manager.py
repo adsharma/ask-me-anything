@@ -32,13 +32,13 @@ class AIBackendManager:
                 ],
             },
             "ollama": {
-                "default_model": "qwen3:0.6b",
+                "default_model": None,
                 "requires_api_key": False,
                 "base_url": "http://localhost:11434",
                 "models": [],  # Will be fetched dynamically
             },
             "mlx": {
-                "default_model": "baidu/ERNIE-4.5-0.3B-PT",
+                "default_model": None,
                 "requires_api_key": False,
                 "base_url": "http://localhost:8081",  # Default MLX OpenAI-compatible server
                 "models": [],  # Will be fetched dynamically
@@ -55,13 +55,30 @@ class AIBackendManager:
             },
         }
 
-        # Initialize current model to backend's default
-        self.current_model = self.backend_settings[self.current_backend][
-            "default_model"
-        ]
-
         # Configure LiteLLM
         litellm.set_verbose = False  # Set to True for debugging
+        self._initialize_current_model()
+
+    def _initialize_current_model(self):
+        """Set the current model for the current backend."""
+        logger.info(f"Initializing current model for {self.current_backend}")
+        if self.current_backend in ["ollama", "mlx"]:
+            try:
+                available_models = self.list_models()
+                if available_models:
+                    self.current_model = available_models[0]
+                    self.backend_settings[self.current_backend]["default_model"] = available_models[0]
+                    logger.info(f"Set default model to {self.current_model}")
+                else:
+                    logger.warning(f"No models available for {self.current_backend}")
+                    self.current_model = None
+
+            except Exception as e:
+                logger.error(f"Error fetching {self.current_backend} models: {e}")
+        else:
+            # Settings define default for non-local backends
+            self.current_model = self.backend_settings[self.current_backend]["default_model"]
+            logger.info(f"Set default model to {self.current_model}")
 
     def set_backend(self, backend_type: str) -> bool:
         """Set the current backend type."""
@@ -108,7 +125,7 @@ class AIBackendManager:
 
     async def set_model_async(self, model_name: str) -> bool:
         """Async version of set_model that can validate against dynamic model lists."""
-        available_models = await self.list_models()
+        available_models = self.list_models()
         if model_name not in available_models:
             logger.error(
                 f"Model {model_name} not available for backend {self.current_backend}"
@@ -139,14 +156,14 @@ class AIBackendManager:
         """Check if current backend requires an API key."""
         return self.backend_settings[self.current_backend]["requires_api_key"]
 
-    async def list_models(self) -> List[str]:
+    def list_models(self) -> List[str]:
         """List available models for the current backend."""
         backend_config = self.backend_settings[self.current_backend]
 
         if self.current_backend in ["ollama", "mlx"]:
             # For local backends, try to fetch models dynamically
             try:
-                models = await self._fetch_local_models()
+                models = self._fetch_local_models()
                 if models:
                     backend_config["models"] = models
                     return models
@@ -158,7 +175,7 @@ class AIBackendManager:
 
         return backend_config["models"]
 
-    async def _fetch_local_models(self) -> List[str]:
+    def _fetch_local_models(self) -> List[str]:
         """Fetch available models from local backends (Ollama/MLX)."""
         backend_config = self.backend_settings[self.current_backend]
         base_url = backend_config.get("base_url")
