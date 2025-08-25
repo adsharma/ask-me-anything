@@ -2,7 +2,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 import litellm
 import requests
@@ -568,12 +568,12 @@ class AIBackendManager:
                 if MLX_AVAILABLE and not self.mlx_model:
                     result["valid"] = False
                     result["issues"].append(
-                        f"MLX model not loaded. Please set a model for the MLX backend."
+                        "MLX model not loaded. Please set a model for the MLX backend."
                     )
                 elif not MLX_AVAILABLE:
                     result["valid"] = False
                     result["issues"].append(
-                        f"MLX is not available. Please install mlx_lm package."
+                        "MLX is not available. Please install mlx_lm package."
                     )
 
         return result
