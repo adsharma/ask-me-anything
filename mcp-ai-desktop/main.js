@@ -44,6 +44,42 @@ const MODEL_HELPERS = {
 };
 
 let currentBackend = BACKEND_TYPES.OLLAMA; // Default to Ollama for local models
+let currentModel = null; // Store current model
+let userDataPath = app.getPath('userData'); // Get user data path for config storage
+let configPath = path.join(userDataPath, 'config.json'); // Config file path
+
+// Load configuration from file
+async function loadConfig() {
+  try {
+    const configData = await fs.readFile(configPath, 'utf8');
+    const config = JSON.parse(configData);
+    if (config.backend) {
+      currentBackend = config.backend;
+    }
+    if (config.model) {
+      currentModel = config.model;
+    }
+    console.log('[loadConfig] Configuration loaded:', config);
+  } catch (error) {
+    // Config file doesn't exist or is invalid, use defaults
+    console.log('[loadConfig] No config file found or invalid, using defaults');
+  }
+}
+
+// Save configuration to file
+async function saveConfig() {
+  try {
+    const config = {
+      backend: currentBackend,
+      model: currentModel,
+      lastUpdated: new Date().toISOString()
+    };
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    console.log('[saveConfig] Configuration saved:', config);
+  } catch (error) {
+    console.error('[saveConfig] Error saving configuration:', error);
+  }
+}
 
 // Backend status checking function
 async function checkBackendStatus() {
@@ -260,8 +296,11 @@ function createWindow() {
   );
 }
 
-app.whenReady().then(() => {
-  console.log("[app.whenReady] App ready. Starting Python backend and creating window...");
+app.whenReady().then(async () => {
+  console.log("[app.whenReady] App ready. Loading configuration and starting Python backend...");
+
+  // Load configuration before starting anything
+  await loadConfig();
 
   // Determine Python backend path based on whether app is packaged
   let pythonBackendPath;
@@ -278,6 +317,15 @@ app.whenReady().then(() => {
     pythonBackendDir = path.join(__dirname, '..', 'python_backend');
   }
 
+  // Build command arguments with initial backend and model if available
+  let pythonArgs = [pythonBackendPath, '--port', pythonPort.toString()];
+  if (currentBackend) {
+    pythonArgs.push('--backend', currentBackend);
+  }
+  if (currentModel) {
+    pythonArgs.push('--model', currentModel);
+  }
+
   const spawnOptions = {
     cwd: pythonBackendDir,
     detached: false,
@@ -286,7 +334,7 @@ app.whenReady().then(() => {
   };
 
   console.log(`[app.whenReady] Using Python backend with uv run: ${pythonBackendPath}`);
-  pythonProcess = spawn('uv', ['run', pythonBackendPath, '--port', pythonPort.toString()], spawnOptions);  // Start monitoring backend startup
+  pythonProcess = spawn('uv', ['run', ...pythonArgs], spawnOptions);  // Start monitoring backend startup
   monitorBackendStartup();
 
   pythonProcess.stdout.on('data', (data) => {
@@ -613,6 +661,9 @@ ipcMain.handle("set-backend", async (event, backendType) => {
       // The local backend is still set correctly
     }
 
+    // Save the backend to config
+    await saveConfig();
+
     return { success: true, backend: currentBackend };
   } else {
     throw new Error(`Invalid backend type: ${backendType}`);
@@ -725,10 +776,14 @@ ipcMain.handle("get-model", async () => {
       throw new Error(data.message || `HTTP error! status: ${response.status}`);
     }
     console.log("[ipcMain] get-model response:", data);
+    // Update our stored model value
+    currentModel = data.model;
+    await saveConfig();
     return data.model; // Assuming backend returns { status: 'success', model: '...' }
   } catch (error) {
     console.error("[ipcMain] Error getting current model:", error);
-    throw error;
+    // Return our stored model value if backend is not available
+    return currentModel || "";
   }
 });
 
@@ -745,6 +800,11 @@ ipcMain.handle("set-model", async (event, modelName) => {
       throw new Error(data.message || `HTTP error! status: ${response.status}`);
     }
     console.log("[ipcMain] set-model response:", data);
+
+    // Save the model to config
+    currentModel = modelName;
+    await saveConfig();
+
     // Optionally notify main window or handle success/error feedback
     if (mainWindow) {
         mainWindow.webContents.send("model-update-status", { success: true, message: data.message, model: modelName });
@@ -765,22 +825,19 @@ ipcMain.handle("set-model", async (event, modelName) => {
 ipcMain.handle("get-current-settings", async () => {
   try {
     if (!pythonPort) {
-      return { apiKey: "", model: "", backend: currentBackend };
+      return { apiKey: "", model: currentModel || "", backend: currentBackend };
     }
 
     // For now, we don't store the API key locally for security reasons
-    // But we can get the current model
-    const modelResponse = await fetch(`http://127.0.0.1:${pythonPort}/get-model`);
-    const modelData = await modelResponse.json();
-
+    // Return our stored model value instead of querying the backend
     return {
       apiKey: "", // Don't return actual API key for security
-      model: modelData.model || "",
+      model: currentModel || "",
       backend: currentBackend
     };
   } catch (error) {
     console.error("Error getting current settings:", error);
-    return { apiKey: "", model: "", backend: currentBackend };
+    return { apiKey: "", model: currentModel || "", backend: currentBackend };
   }
 });
 
@@ -862,6 +919,9 @@ ipcMain.handle("save-api-key", async (event, apiKey, model, backend) => {
         throw new Error(modelData.message || `HTTP error! status: ${modelResponse.status}`);
       }
 
+      // Update current model and save config
+      currentModel = model;
+
       // Notify renderer about model change
       if (mainWindow) {
         mainWindow.webContents.send('model-update-status', {
@@ -871,6 +931,9 @@ ipcMain.handle("save-api-key", async (event, apiKey, model, backend) => {
         });
       }
     }
+
+    // Save configuration
+    await saveConfig();
 
     console.log("[save-api-key] Settings saved successfully");
     return {success: true, message: "Settings saved successfully"};

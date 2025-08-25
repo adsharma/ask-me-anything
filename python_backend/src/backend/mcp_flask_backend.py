@@ -841,6 +841,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port", type=int, default=5001, help="Port to run the backend on"
     )
+    parser.add_argument("--backend", type=str, help="Initial backend to use")
+    parser.add_argument("--model", type=str, help="Initial model to use")
     args = parser.parse_args()
 
     thread = threading.Thread(target=start_async_loop, daemon=True)
@@ -860,6 +862,15 @@ if __name__ == "__main__":
             logger.info(
                 "Chat app initialized successfully via asyncio loop with Ollama backend."
             )
+
+            # Set initial backend and model if provided
+            if args.backend:
+                chat_app.set_backend(args.backend)
+                logger.info(f"Set initial backend to: {args.backend}")
+
+            if args.model:
+                chat_app.set_model(args.model)
+                logger.info(f"Set initial model to: {args.model}")
 
             # Load default servers from mcp_servers.json BEFORE starting Flask
             load_servers_future = asyncio.run_coroutine_threadsafe(
