@@ -2,11 +2,20 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import litellm
 import requests
 from litellm import acompletion, completion
+
+# MLX imports (optional, will be imported when needed)
+try:
+    import mlx_lm
+
+    MLX_AVAILABLE = True
+except ImportError:
+    MLX_AVAILABLE = False
+    mlx_lm = None
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +29,11 @@ class AIBackendManager:
         self.current_backend = "ollama"  # default to Ollama for local models
         self.current_model = None
         self.api_key = None
+
+        # MLX-specific attributes
+        self.mlx_model = None
+        self.mlx_tokenizer = None
+        self.mlx_model_name = None
 
         # Backend-specific settings
         self.backend_settings = {
@@ -42,8 +56,7 @@ class AIBackendManager:
             "mlx": {
                 "default_model": None,
                 "requires_api_key": False,
-                "base_url": "http://localhost:8081",  # Default MLX OpenAI-compatible server
-                "models": [],  # Will be fetched dynamically
+                "models": ["mlx-community/ERNIE-4.5-0.3B-PT-4bit"],  # Default MLX model
             },
             "openai": {
                 "default_model": "gpt-4o-mini",
@@ -101,7 +114,32 @@ class AIBackendManager:
             self.current_model = self.backend_settings[backend_type]["default_model"]
             logger.info(f"Set default model to {self.current_model}")
 
+            # Load MLX model if switching to MLX backend
+            if backend_type == "mlx" and MLX_AVAILABLE:
+                self._load_mlx_model(self.current_model)
+
         return True
+
+    def _load_mlx_model(self, model_name: str):
+        """Load an MLX model."""
+        if not MLX_AVAILABLE:
+            logger.error("MLX is not available")
+            return False
+
+        try:
+            # If the same model is already loaded, don't reload
+            if self.mlx_model_name == model_name:
+                logger.info(f"MLX model {model_name} is already loaded")
+                return True
+
+            logger.info(f"Loading MLX model: {model_name}")
+            self.mlx_model, self.mlx_tokenizer = mlx_lm.load(model_name, tokenizer_config={"trust_remote_code": True})
+            self.mlx_model_name = model_name
+            logger.info(f"Successfully loaded MLX model: {model_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error loading MLX model {model_name}: {e}")
+            return False
 
     def get_backend(self) -> str:
         """Get the current backend type."""
@@ -127,6 +165,11 @@ class AIBackendManager:
 
         self.current_model = model_name
         logger.info(f"Set model to {model_name} for backend {self.current_backend}")
+
+        # Load MLX model if using MLX backend
+        if self.current_backend == "mlx" and MLX_AVAILABLE:
+            return self._load_mlx_model(model_name)
+
         return True
 
     async def set_model_async(self, model_name: str) -> bool:
@@ -140,6 +183,11 @@ class AIBackendManager:
 
         self.current_model = model_name
         logger.info(f"Set model to {model_name} for backend {self.current_backend}")
+
+        # Load MLX model if using MLX backend
+        if self.current_backend == "mlx" and MLX_AVAILABLE:
+            return self._load_mlx_model(model_name)
+
         return True
 
     def get_model(self) -> str:
@@ -184,28 +232,20 @@ class AIBackendManager:
     def _fetch_local_models(self) -> List[str]:
         """Fetch available models from local backends (Ollama/MLX)."""
         backend_config = self.backend_settings[self.current_backend]
-        base_url = backend_config.get("base_url")
 
-        if not base_url:
-            return []
-
-        try:
-            if self.current_backend == "ollama":
-                # Ollama API endpoint
-                url = f"{base_url}/api/tags"
-                response = requests.get(url, timeout=5)
-                if response.status_code == 200:
-                    data = response.json()
-                    return [model["name"] for model in data.get("models", [])]
-            elif self.current_backend == "mlx":
-                # MLX OpenAI-compatible endpoint
-                url = f"{base_url}/v1/models"
-                response = requests.get(url, timeout=5)
-                if response.status_code == 200:
-                    data = response.json()
-                    return [model["id"] for model in data.get("data", [])]
-        except Exception as e:
-            logger.error(f"Error fetching models from {self.current_backend}: {e}")
+        if self.current_backend == "ollama":
+            # Ollama API endpoint
+            base_url = backend_config.get("base_url")
+            if not base_url:
+                return []
+            url = f"{base_url}/api/tags"
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                return [model["name"] for model in data.get("models", [])]
+        elif self.current_backend == "mlx":
+            # For MLX, return the available models (since we're not using a server)
+            return backend_config["models"]
 
         return []
 
@@ -216,8 +256,8 @@ class AIBackendManager:
         elif self.current_backend == "ollama":
             return f"ollama/{self.current_model}"
         elif self.current_backend == "mlx":
-            # MLX uses OpenAI-compatible format
-            return f"openai/{self.current_model}"
+            # MLX doesn't use LiteLLM, we handle it directly
+            return f"mlx/{self.current_model}"
         elif self.current_backend == "openai":
             return self.current_model
         else:
@@ -231,9 +271,8 @@ class AIBackendManager:
             backend_config = self.backend_settings["ollama"]
             kwargs["api_base"] = backend_config["base_url"]
         elif self.current_backend == "mlx":
-            backend_config = self.backend_settings["mlx"]
-            kwargs["api_base"] = f"{backend_config['base_url']}/v1"
-            kwargs["api_key"] = "dummy"  # MLX doesn't need real API key
+            # MLX doesn't use LiteLLM, we handle it directly
+            pass
         elif self.current_backend == "gemini":
             if self.api_key:
                 kwargs["api_key"] = self.api_key
@@ -246,6 +285,37 @@ class AIBackendManager:
                 kwargs["api_key"] = os.getenv("OPENAI_API_KEY")
 
         return kwargs
+
+    async def _generate_mlx_response(
+        self, messages: List[Dict[str, str]], **kwargs
+    ) -> str:
+        """Generate a response using MLX directly."""
+        if not MLX_AVAILABLE:
+            raise Exception("MLX is not available")
+
+        if not self.mlx_model or not self.mlx_tokenizer:
+            raise Exception("MLX model not loaded")
+
+        # Convert messages to a prompt string
+        prompt = ""
+        for message in messages:
+            role = message["role"]
+            content = message["content"]
+            if role == "system":
+                prompt += f"System: {content}\n"
+            elif role == "user":
+                prompt += f"User: {content}\n"
+            elif role == "assistant":
+                prompt += f"Assistant: {content}\n"
+
+        prompt += "Assistant:"
+
+        # Generate response using MLX
+        response = mlx_lm.generate(
+            self.mlx_model, self.mlx_tokenizer, prompt=prompt, verbose=False, **kwargs
+        )
+
+        return response
 
     async def chat_async(
         self,
@@ -283,7 +353,16 @@ class AIBackendManager:
             else:
                 messages.append({"role": "user", "content": message})
 
-            # Prepare LiteLLM parameters
+            # Handle MLX directly
+            if self.current_backend == "mlx":
+                logger.info(
+                    f"Sending chat request to MLX with model {self.current_model}"
+                )
+                # MLX doesn't support tools or image data in this implementation
+                response = await self._generate_mlx_response(messages)
+                return response
+
+            # Prepare LiteLLM parameters for other backends
             model_name = self._prepare_litellm_model_name()
             kwargs = self._prepare_litellm_kwargs()
 
@@ -342,7 +421,16 @@ class AIBackendManager:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": message})
 
-            # Prepare LiteLLM parameters
+            # Handle MLX directly
+            if self.current_backend == "mlx":
+                logger.info(
+                    f"Sending sync chat request to MLX with model {self.current_model}"
+                )
+                # MLX doesn't support tools in this implementation
+                response = self._generate_mlx_response(messages)
+                return response
+
+            # Prepare LiteLLM parameters for other backends
             model_name = self._prepare_litellm_model_name()
             kwargs = self._prepare_litellm_kwargs()
 
@@ -417,24 +505,33 @@ class AIBackendManager:
 
         # Check if local service is accessible for local backends
         if self.current_backend in LOCAL_BACKENDS:
-            base_url = backend_config.get("base_url")
-            if base_url:
-                try:
-                    health_url = (
-                        f"{base_url}/api/tags"
-                        if self.current_backend == "ollama"
-                        else f"{base_url}/v1/models"
-                    )
-                    response = requests.get(health_url, timeout=3)
-                    if response.status_code != 200:
+            if self.current_backend == "ollama":
+                base_url = backend_config.get("base_url")
+                if base_url:
+                    try:
+                        health_url = f"{base_url}/api/tags"
+                        response = requests.get(health_url, timeout=3)
+                        if response.status_code != 200:
+                            result["valid"] = False
+                            result["issues"].append(
+                                f"{self.current_backend} service not accessible at {base_url}"
+                            )
+                    except Exception as e:
                         result["valid"] = False
                         result["issues"].append(
-                            f"{self.current_backend} service not accessible at {base_url}"
+                            f"{self.current_backend} service not accessible: {str(e)}"
                         )
-                except Exception as e:
+            elif self.current_backend == "mlx":
+                # For MLX, check if the model is loaded
+                if MLX_AVAILABLE and not self.mlx_model:
                     result["valid"] = False
                     result["issues"].append(
-                        f"{self.current_backend} service not accessible: {str(e)}"
+                        f"MLX model not loaded. Please set a model for the MLX backend."
+                    )
+                elif not MLX_AVAILABLE:
+                    result["valid"] = False
+                    result["issues"].append(
+                        f"MLX is not available. Please install mlx_lm package."
                     )
 
         return result
