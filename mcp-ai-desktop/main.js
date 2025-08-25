@@ -5,6 +5,16 @@ const path = require("path");
 const fs = require("fs").promises; // Import fs promises
 const { spawn } = require('child_process');
 
+// Fix PATH for macOS to include uv binary location
+if (process.platform === 'darwin') {
+  // Add common paths that might be missing
+  process.env.PATH = [
+    '/usr/local/bin',
+    '/opt/homebrew/bin',  // for Apple Silicon Macs
+    process.env.PATH
+  ].join(':');
+}
+
 let mainWindow;
 let settingsWindow = null;
 let pythonProcess = null;
