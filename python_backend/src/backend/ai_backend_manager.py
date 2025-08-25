@@ -10,6 +10,8 @@ from litellm import acompletion, completion
 
 logger = logging.getLogger(__name__)
 
+LOCAL_BACKENDS = ["ollama", "mlx"]
+
 
 class AIBackendManager:
     """Manages multiple AI backends using LiteLLM for unified interface."""
@@ -62,7 +64,7 @@ class AIBackendManager:
     def _initialize_current_model(self):
         """Set the current model for the current backend."""
         logger.info(f"Initializing current model for {self.current_backend}")
-        if self.current_backend in ["ollama", "mlx"]:
+        if self.current_backend in LOCAL_BACKENDS:
             try:
                 available_models = self.list_models()
                 if available_models:
@@ -164,7 +166,7 @@ class AIBackendManager:
         """List available models for the current backend."""
         backend_config = self.backend_settings[self.current_backend]
 
-        if self.current_backend in ["ollama", "mlx"]:
+        if self.current_backend in LOCAL_BACKENDS:
             # For local backends, try to fetch models dynamically
             try:
                 models = await self._fetch_local_models()
@@ -414,7 +416,7 @@ class AIBackendManager:
                 )
 
         # Check if local service is accessible for local backends
-        if self.current_backend in ["ollama", "mlx"]:
+        if self.current_backend in LOCAL_BACKENDS:
             base_url = backend_config.get("base_url")
             if base_url:
                 try:
