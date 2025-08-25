@@ -11,11 +11,13 @@ from litellm import acompletion, completion
 # MLX imports (optional, will be imported when needed)
 try:
     import mlx_lm
+    from huggingface_hub import scan_cache_dir
 
     MLX_AVAILABLE = True
 except ImportError:
     MLX_AVAILABLE = False
     mlx_lm = None
+    scan_cache_dir = None
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ class AIBackendManager:
             "mlx": {
                 "default_model": None,
                 "requires_api_key": False,
-                "models": ["mlx-community/ERNIE-4.5-0.3B-PT-4bit"],  # Default MLX model
+                "models": self._get_default_mlx_models(),  # Scan for default MLX models
             },
             "openai": {
                 "default_model": "gpt-4o-mini",
@@ -73,6 +75,25 @@ class AIBackendManager:
         # Configure LiteLLM
         litellm.set_verbose = False  # Set to True for debugging
         self._initialize_current_model()
+
+    def _get_default_mlx_models(self) -> List[str]:
+        """Get default MLX models by scanning local cache."""
+        if not MLX_AVAILABLE or not scan_cache_dir:
+            return []  # Fallback default
+
+        try:
+            # Scan Hugging Face cache for mlx models
+            hf_cache_info = scan_cache_dir()
+            mlx_models = [
+                repo.repo_id
+                for repo in sorted(hf_cache_info.repos, key=lambda repo: repo.repo_path)
+                if "mlx" in repo.repo_id.lower()
+            ]
+
+            # If we found models, return them, otherwise return a default
+            return mlx_models
+        except Exception as e:
+            logger.warning(f"Error scanning for MLX models: {e}")
 
     def _initialize_current_model(self):
         """Set the current model for the current backend."""
@@ -133,7 +154,9 @@ class AIBackendManager:
                 return True
 
             logger.info(f"Loading MLX model: {model_name}")
-            self.mlx_model, self.mlx_tokenizer = mlx_lm.load(model_name, tokenizer_config={"trust_remote_code": True})
+            self.mlx_model, self.mlx_tokenizer = mlx_lm.load(
+                model_name, tokenizer_config={"trust_remote_code": True}
+            )
             self.mlx_model_name = model_name
             logger.info(f"Successfully loaded MLX model: {model_name}")
             return True
@@ -244,8 +267,27 @@ class AIBackendManager:
                 data = response.json()
                 return [model["name"] for model in data.get("models", [])]
         elif self.current_backend == "mlx":
-            # For MLX, return the available models (since we're not using a server)
-            return backend_config["models"]
+            # For MLX, scan for locally cached models
+            if MLX_AVAILABLE and scan_cache_dir:
+                try:
+                    hf_cache_info = scan_cache_dir()
+                    mlx_models = [
+                        repo.repo_id
+                        for repo in sorted(
+                            hf_cache_info.repos, key=lambda repo: repo.repo_path
+                        )
+                        if "mlx" in repo.repo_id.lower()
+                    ]
+                    # Update the backend config with the discovered models
+                    self.backend_settings["mlx"]["models"] = mlx_models
+                    return mlx_models
+                except Exception as e:
+                    logger.warning(f"Error scanning for MLX models: {e}")
+                    # Fall back to the default models
+                    return backend_config["models"]
+            else:
+                # Fallback to the default models if scanning is not available
+                return backend_config["models"]
 
         return []
 
