@@ -9,7 +9,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "flask>=3.1.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
     "google-genai>=1.7.0",
     "httpx>=0.28.1",
     "mcp>=1.5.0",
