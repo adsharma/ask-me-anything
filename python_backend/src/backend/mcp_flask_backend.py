@@ -294,7 +294,7 @@ async def set_model_async(model_name):
                 "message": f"Model set to {model_name} for {backend} backend.",
             }, 200
         else:
-            available_models = await app.list_available_models()
+            available_models = app.list_available_models()
             return {
                 "status": "error",
                 "message": f"Invalid model: {model_name}. Available: {', '.join(available_models)}",
@@ -322,13 +322,13 @@ async def list_models_async():
         # Return empty list even if app not fully initialized
         temp_app = MCPChatApp()
         try:
-            available_models = await temp_app.list_available_models()
+            available_models = temp_app.list_available_models()
             return {"status": "success", "models": available_models}, 200
         except Exception as e:
             logger.error(f"Error listing models with temp app: {e}")
             return {"status": "error", "message": f"Failed to list models: {e}"}, 500
     try:
-        available_models = await app.list_available_models()
+        available_models = app.list_available_models()
         return {"status": "success", "models": available_models}, 200
     except Exception as e:
         logger.error(f"Error listing available models: {e}", exc_info=True)
@@ -702,7 +702,7 @@ def list_models():
         # Fallback for when loop isn't running (e.g., during startup errors)
         try:
             temp_app = MCPChatApp()
-            models = asyncio.run(temp_app.list_available_models())
+            models = temp_app.list_available_models()
             return jsonify({"status": "success", "models": models}), 200
         except Exception as e:
             logger.error(f"Error listing models directly (no loop): {e}", exc_info=True)
