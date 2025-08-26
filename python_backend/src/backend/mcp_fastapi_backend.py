@@ -180,12 +180,12 @@ async def disconnect_server_async(identifier):
             return {
                 "status": "success",
                 "message": f"Server '{server_display_name}' disconnected.",
-            }
+            }, 200
         else:
             return {
                 "status": "error",
                 "message": f"Server '{server_display_name}' not found or already disconnected.",
-            }
+            }, 404
     except Exception as e:
         logger.error(f"Error disconnecting server {identifier}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to disconnect server: {e}"}, 500
@@ -207,7 +207,7 @@ async def disconnect_all_servers_async():
 
         if not servers:
             logger.info("No servers to disconnect")
-            return {"status": "success", "message": "No servers to disconnect"}
+            return {"status": "success", "message": "No servers to disconnect"}, 200
 
         logger.info(f"Cleaning up {len(servers)} MCP servers: {servers}")
 
@@ -224,7 +224,7 @@ async def disconnect_all_servers_async():
                 "servers_cleaned": [
                     Path(s).name if "/" in s or "\\" in s else s for s in servers
                 ],
-            }
+            }, 200
         else:
             logger.warning(
                 "cleanup_all_servers() returned False - some errors occurred"
@@ -232,14 +232,14 @@ async def disconnect_all_servers_async():
             return {
                 "status": "error",
                 "message": "Cleanup completed with some errors - check logs",
-            }
+            }, 500
 
     except Exception as e:
         logger.error(f"Error in disconnect_all_servers_async: {e}", exc_info=True)
         return {
             "status": "error",
             "message": f"Failed to disconnect all servers: {e}",
-        }
+        }, 500
 
 
 async def get_servers_async():
@@ -262,7 +262,7 @@ async def get_servers_async():
                 "status": resources.get("status", "unknown"),
             }
         )
-    return {"status": "success", "servers": servers}
+    return {"status": "success", "servers": servers}, 200
 
 
 async def process_chat_async(message):
@@ -271,7 +271,7 @@ async def process_chat_async(message):
         return {"reply": "Error: Backend chat app not initialized."}, 500
     try:
         reply = await app.process_query(message, maintain_context=True)
-        return {"reply": reply}
+        return {"reply": reply}, 200
     except Exception as e:
         logger.error(f"Error processing chat: {e}", exc_info=True)
         return {"reply": f"An error occurred: {e}"}, 500
@@ -305,13 +305,13 @@ async def set_model_async(model_name):
             return {
                 "status": "success",
                 "message": f"Model set to {model_name} for {backend} backend.",
-            }
+            }, 200
         else:
             available_models = await app.list_available_models()
             return {
                 "status": "error",
                 "message": f"Invalid model: {model_name}. Available: {', '.join(available_models)}",
-            }
+            }, 400
     except Exception as e:
         logger.error(f"Error setting model to {model_name}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set model: {e}"}, 500
@@ -323,7 +323,7 @@ async def get_model_async():
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
         current_model = app.get_model()
-        return {"status": "success", "model": current_model}
+        return {"status": "success", "model": current_model}, 200
     except Exception as e:
         logger.error(f"Error getting current model: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to get model: {e}"}, 500
@@ -336,13 +336,13 @@ async def list_models_async():
         temp_app = MCPChatApp()
         try:
             available_models = await temp_app.list_available_models()
-            return {"status": "success", "models": available_models}
+            return {"status": "success", "models": available_models}, 200
         except Exception as e:
             logger.error(f"Error listing models with temp app: {e}")
             return {"status": "error", "message": f"Failed to list models: {e}"}, 500
     try:
         available_models = await app.list_available_models()
-        return {"status": "success", "models": available_models}
+        return {"status": "success", "models": available_models}, 200
     except Exception as e:
         logger.error(f"Error listing available models: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to list models: {e}"}, 500
@@ -362,12 +362,12 @@ async def set_backend_async(backend_type):
             return {
                 "status": "success",
                 "message": f"Backend set to {backend_type}",
-            }
+            }, 200
         else:
             return {
                 "status": "error",
                 "message": f"Invalid backend type: {backend_type}",
-            }
+            }, 400
     except Exception as e:
         logger.error(f"Error setting backend to {backend_type}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set backend: {e}"}, 500
@@ -379,7 +379,7 @@ async def get_backend_async():
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
         backend = app.get_backend()
-        return {"status": "success", "backend": backend}
+        return {"status": "success", "backend": backend}, 200
     except Exception as e:
         logger.error(f"Error getting backend: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to get backend: {e}"}, 500
@@ -391,7 +391,7 @@ async def validate_backend_async():
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
         validation = app.validate_configuration()
-        return {"status": "success", "validation": validation}
+        return {"status": "success", "validation": validation}, 200
     except Exception as e:
         logger.error(f"Error validating backend: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to validate backend: {e}"}, 500
@@ -403,13 +403,13 @@ async def clear_history_async():
         return {"status": "error", "message": "Chat app not initialized"}, 500
     try:
         app.clear_conversation_history()
-        return {"status": "success", "message": "Conversation history cleared"}
+        return {"status": "success", "message": "Conversation history cleared"}, 200
     except Exception as e:
         logger.error(f"Error clearing conversation history: {e}", exc_info=True)
         return {
             "status": "error",
             "message": f"Failed to clear conversation history: {e}",
-        }
+        }, 500
 
 
 # --- End Backend Management Async Functions ---
