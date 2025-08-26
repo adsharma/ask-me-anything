@@ -1086,16 +1086,16 @@ async function initializeApp() {
         settingsApiKey.placeholder = 'API key not required for local MLX models';
         settingsApiKey.required = false;
         break;
-      case 'anthropic':
-        apiKeyLabel.textContent = 'Anthropic API Key:';
-        settingsApiKey.placeholder = 'Enter your Anthropic API key';
-        settingsApiKey.required = true;
-        break;
-      case 'cohere':
-        apiKeyLabel.textContent = 'Cohere API Key:';
-        settingsApiKey.placeholder = 'Enter your Cohere API key';
-        settingsApiKey.required = true;
-        break;
+      // case 'anthropic':
+      //   apiKeyLabel.textContent = 'Anthropic API Key:';
+      //   settingsApiKey.placeholder = 'Enter your Anthropic API key';
+      //   settingsApiKey.required = true;
+      //   break;
+      // case 'cohere':
+      //   apiKeyLabel.textContent = 'Cohere API Key:';
+      //   settingsApiKey.placeholder = 'Enter your Cohere API key';
+      //   settingsApiKey.required = true;
+      //   break;
     }
   }
 
@@ -1145,7 +1145,8 @@ async function initializeApp() {
     const selectedBackend = settingsBackendSelect.value;
 
     // Validate required fields based on backend
-    if (['gemini', 'openai', 'anthropic', 'cohere'].includes(selectedBackend) && !apiKey) {
+    // NOTE: Add 'anthropic' and 'cohere' API key validation back in once supported.
+    if (['gemini', 'openai'].includes(selectedBackend) && !apiKey) {
       addMessage("API key is required for this provider.", "system");
       return;
     }

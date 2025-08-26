@@ -42,16 +42,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         helpText.textContent = 'API key not required for local MLX models via OpenAI-compatible server';
         apiKeyInput.required = false;
         break;
-      case 'anthropic':
-        apiKeyLabel.textContent = 'Anthropic API Key:';
-        helpText.textContent = 'Enter your Anthropic API key';
-        apiKeyInput.required = true;
-        break;
-      case 'cohere':
-        apiKeyLabel.textContent = 'Cohere API Key:';
-        helpText.textContent = 'Enter your Cohere API key';
-        apiKeyInput.required = true;
-        break;
+      // case 'anthropic':
+      //   apiKeyLabel.textContent = 'Anthropic API Key:';
+      //   helpText.textContent = 'Enter your Anthropic API key';
+      //   apiKeyInput.required = true;
+      //   break;
+      // case 'cohere':
+      //   apiKeyLabel.textContent = 'Cohere API Key:';
+      //   helpText.textContent = 'Enter your Cohere API key';
+      //   apiKeyInput.required = true;
+      //   break;
     }
   }
 
@@ -158,7 +158,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selectedBackend = backendSelect.value;
 
     // Validate required fields based on backend
-    if ((selectedBackend === 'gemini' || selectedBackend === 'openai' || selectedBackend === 'anthropic' || selectedBackend === 'cohere') && !apiKey) {
+    // NOTE: Add 'anthropic' and 'cohere' API key validation back in once supported.
+    if (['gemini', 'openai'].includes(selectedBackend) && !apiKey) {
       alert('API key is required for this provider');
       return;
     }

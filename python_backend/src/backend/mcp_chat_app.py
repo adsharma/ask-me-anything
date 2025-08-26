@@ -77,9 +77,9 @@ class MCPChatApp:
         """Get the current model name."""
         return self.ai_backend.get_model()
 
-    async def list_available_models(self) -> List[str]:
+    def list_available_models(self) -> List[str]:
         """List available models for the current backend."""
-        return await self.ai_backend.list_models()
+        return self.ai_backend.list_models()
 
     def requires_api_key(self) -> bool:
         """Check if current backend requires an API key."""

@@ -131,7 +131,7 @@ class AIBackendManager:
 
     async def set_model_async(self, model_name: str) -> bool:
         """Async version of set_model that can validate against dynamic model lists."""
-        available_models = await self.list_models()
+        available_models = self.list_models()
         if model_name not in available_models:
             logger.error(
                 f"Model {model_name} not available for backend {self.current_backend}"
@@ -162,14 +162,14 @@ class AIBackendManager:
         """Check if current backend requires an API key."""
         return self.backend_settings[self.current_backend]["requires_api_key"]
 
-    async def list_models(self) -> List[str]:
+    def list_models(self) -> List[str]:
         """List available models for the current backend."""
         backend_config = self.backend_settings[self.current_backend]
 
         if self.current_backend in LOCAL_BACKENDS:
             # For local backends, try to fetch models dynamically
             try:
-                models = await self._fetch_local_models()
+                models = self._fetch_local_models()
                 if models:
                     backend_config["models"] = models
                     return models
@@ -181,7 +181,7 @@ class AIBackendManager:
 
         return backend_config["models"]
 
-    async def _fetch_local_models(self) -> List[str]:
+    def _fetch_local_models(self) -> List[str]:
         """Fetch available models from local backends (Ollama/MLX)."""
         backend_config = self.backend_settings[self.current_backend]
         base_url = backend_config.get("base_url")
