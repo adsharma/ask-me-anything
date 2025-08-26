@@ -270,7 +270,21 @@ async def process_chat_async(message):
     if not app:
         return {"reply": "Error: Backend chat app not initialized."}, 500
     try:
-        reply = await app.process_query(message, maintain_context=True)
+        # Handle both string messages and object messages (with image data)
+        if isinstance(message, dict):
+            # Extract text from the message object
+            query_text = message.get("text", "")
+            image_data = message.get("image")
+
+            # Create a proper query object for the chat app
+            query = (
+                {"text": query_text, "image": image_data} if image_data else query_text
+            )
+        else:
+            # Simple string message
+            query = message
+
+        reply = await app.process_query(query, maintain_context=True)
         return {"reply": reply}, 200
     except Exception as e:
         logger.error(f"Error processing chat: {e}", exc_info=True)
@@ -429,7 +443,13 @@ async def chat(request: Request):
     future = asyncio.run_coroutine_threadsafe(process_chat_async(message), loop)
     try:
         result = future.result(timeout=60)
-        return result
+        # Unpack the result tuple and return proper JSON response
+        if isinstance(result, tuple) and len(result) == 2:
+            response_data, status_code = result
+            return JSONResponse(content=response_data, status_code=status_code)
+        else:
+            # Handle case where result is already a dict (error cases)
+            return JSONResponse(content=result, status_code=200)
     except asyncio.TimeoutError:
         logger.error("Chat processing timed out.")
         raise HTTPException(status_code=504, detail="Error: Response timed out.")
