@@ -309,11 +309,11 @@ app.whenReady().then(async () => {
   if (app.isPackaged) {
     // In production, use the packaged Python source with uv run
     const resourcesPath = process.resourcesPath;
-    pythonBackendPath = path.join(resourcesPath, 'python_backend', 'src', 'backend', 'mcp_flask_backend.py');
+    pythonBackendPath = path.join(resourcesPath, 'python_backend', 'src', 'backend', 'mcp_fastapi_backend.py');
     pythonBackendDir = path.join(resourcesPath, 'python_backend');
   } else {
     // In development, use uv run with the Python script
-    pythonBackendPath = path.join(__dirname, '..', 'python_backend', 'src', 'backend', 'mcp_flask_backend.py');
+    pythonBackendPath = path.join(__dirname, '..', 'python_backend', 'src', 'backend', 'mcp_fastapi_backend.py');
     pythonBackendDir = path.join(__dirname, '..', 'python_backend');
   }
 
