@@ -225,7 +225,7 @@ async def disconnect_all_servers_async() -> Tuple[Dict[str, Any], int]:
                 "status": "success",
                 "message": f"Successfully cleaned up {len(servers)} servers",
                 "servers_cleaned": [
-                    Path(s).name if "/" in s or "\\\\" in s else s for s in servers
+                    Path(s).name if "/" in s or "\\" in s else s for s in servers
                 ],
             }, 200
         else:
