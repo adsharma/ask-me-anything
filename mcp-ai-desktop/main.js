@@ -11,6 +11,7 @@ if (process.platform === 'darwin') {
   process.env.PATH = [
     '/usr/local/bin',
     '/opt/homebrew/bin',  // for Apple Silicon Macs
+    `${process.env.HOME}/.local/bin`,  // add user's local bin
     process.env.PATH
   ].join(':');
 }
