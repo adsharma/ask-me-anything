@@ -19,8 +19,6 @@ const BACKEND_TYPES = {
   OLLAMA: 'ollama',
   OPENAI: 'openai',
   MLX: 'mlx', // For MLX via OpenAI-compatible local server
-  // ANTHROPIC: 'anthropic',
-  // COHERE: 'cohere'
 };
 
 // Model name helpers for LiteLLM format
