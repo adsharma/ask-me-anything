@@ -6,6 +6,7 @@ import logging
 import sys
 import threading
 from pathlib import Path
+from typing import Any, Dict, Tuple
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -132,7 +133,9 @@ async def load_default_servers():
         )
 
 
-async def add_server_async(path=None, name=None, command=None, args=None, env=None):
+async def add_server_async(
+    path=None, name=None, command=None, args=None, env=None
+) -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -165,7 +168,7 @@ async def add_server_async(path=None, name=None, command=None, args=None, env=No
         return {"status": "error", "message": f"Failed to add server: {e}"}, 500
 
 
-async def disconnect_server_async(identifier):
+async def disconnect_server_async(identifier) -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -191,7 +194,7 @@ async def disconnect_server_async(identifier):
         return {"status": "error", "message": f"Failed to disconnect server: {e}"}, 500
 
 
-async def disconnect_all_servers_async():
+async def disconnect_all_servers_async() -> Tuple[Dict[str, Any], int]:
     """Disconnect all connected MCP servers using comprehensive cleanup"""
     logger.info("Starting disconnect_all_servers_async")
 
@@ -222,7 +225,7 @@ async def disconnect_all_servers_async():
                 "status": "success",
                 "message": f"Successfully cleaned up {len(servers)} servers",
                 "servers_cleaned": [
-                    Path(s).name if "/" in s or "\\" in s else s for s in servers
+                    Path(s).name if "/" in s or "\\\\" in s else s for s in servers
                 ],
             }, 200
         else:
@@ -242,7 +245,7 @@ async def disconnect_all_servers_async():
         }, 500
 
 
-async def get_servers_async():
+async def get_servers_async() -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -265,7 +268,7 @@ async def get_servers_async():
     return {"status": "success", "servers": servers}, 200
 
 
-async def process_chat_async(message):
+async def process_chat_async(message) -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"reply": "Error: Backend chat app not initialized."}, 500
@@ -291,7 +294,7 @@ async def process_chat_async(message):
         return {"reply": f"An error occurred: {e}"}, 500
 
 
-async def set_api_key_async(api_key):
+async def set_api_key_async(api_key) -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -301,14 +304,14 @@ async def set_api_key_async(api_key):
         return {
             "status": "success",
             "message": f"API Key set for {backend} backend.",
-        }
+        }, 200
     except Exception as e:
         logger.error(f"Error setting API key: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to set API key: {e}"}, 500
 
 
 # --- Model Switching Async Functions ---
-async def set_model_async(model_name):
+async def set_model_async(model_name) -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -331,7 +334,7 @@ async def set_model_async(model_name):
         return {"status": "error", "message": f"Failed to set model: {e}"}, 500
 
 
-async def get_model_async():
+async def get_model_async() -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -343,7 +346,7 @@ async def get_model_async():
         return {"status": "error", "message": f"Failed to get model: {e}"}, 500
 
 
-async def list_models_async():
+async def list_models_async() -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         # Return empty list even if app not fully initialized
@@ -366,7 +369,7 @@ async def list_models_async():
 
 
 # --- Backend Management Async Functions ---
-async def set_backend_async(backend_type):
+async def set_backend_async(backend_type) -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -387,7 +390,7 @@ async def set_backend_async(backend_type):
         return {"status": "error", "message": f"Failed to set backend: {e}"}, 500
 
 
-async def get_backend_async():
+async def get_backend_async() -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -399,7 +402,7 @@ async def get_backend_async():
         return {"status": "error", "message": f"Failed to get backend: {e}"}, 500
 
 
-async def validate_backend_async():
+async def validate_backend_async() -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -411,7 +414,7 @@ async def validate_backend_async():
         return {"status": "error", "message": f"Failed to validate backend: {e}"}, 500
 
 
-async def clear_history_async():
+async def clear_history_async() -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
@@ -677,7 +680,7 @@ async def list_models():
         try:
             temp_app = MCPChatApp()
             models = asyncio.run(temp_app.list_available_models())
-            return {"status": "success", "models": models}
+            return {"status": "success", "models": models}, 200
         except Exception as e:
             logger.error(f"Error listing models directly (no loop): {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Error listing models: {e}")
