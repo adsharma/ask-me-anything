@@ -94,33 +94,54 @@ async def load_default_servers():
                 logger.info(f"Skipping disabled server: {server_name}")
                 continue
 
-            if not server_config.get("command") or not server_config.get("args"):
+            # Check if it's a URL-based server
+            if server_config.get("url"):
+                try:
+                    # Get environment variables if specified
+                    env_vars = server_config.get("env", {})
+                    if env_vars:
+                        logger.info(
+                            f"Passing environment variables to server {server_name}: {list(env_vars.keys())}"
+                        )
+
+                    added_tools = await app.connect_to_mcp_server(
+                        name=server_name,
+                        url=server_config["url"],
+                        env=env_vars,
+                    )
+                    logger.info(
+                        f"Successfully loaded default server '{server_name}' with {len(added_tools)} tools"
+                    )
+                    loaded_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to load default server '{server_name}': {e}")
+            elif not server_config.get("command") or not server_config.get("args"):
                 logger.warning(
                     f"Invalid server config for {server_name}: missing command or args"
                 )
                 continue
+            else:
+                try:
+                    # Get environment variables if specified
+                    env_vars = server_config.get("env", {})
+                    if env_vars:
+                        logger.info(
+                            f"Passing environment variables to server {server_name}: {list(env_vars.keys())}"
+                        )
 
-            try:
-                # Get environment variables if specified
-                env_vars = server_config.get("env", {})
-                if env_vars:
-                    logger.info(
-                        f"Passing environment variables to server {server_name}: {list(env_vars.keys())}"
+                    added_tools = await app.connect_to_mcp_server(
+                        name=server_name,
+                        command=server_config["command"],
+                        args=server_config["args"],
+                        env=env_vars,
                     )
+                    logger.info(
+                        f"Successfully loaded default server '{server_name}' with {len(added_tools)} tools"
+                    )
+                    loaded_count += 1
 
-                added_tools = await app.connect_to_mcp_server(
-                    name=server_name,
-                    command=server_config["command"],
-                    args=server_config["args"],
-                    env=env_vars,
-                )
-                logger.info(
-                    f"Successfully loaded default server '{server_name}' with {len(added_tools)} tools"
-                )
-                loaded_count += 1
-
-            except Exception as e:
-                logger.error(f"Failed to load default server '{server_name}': {e}")
+                except Exception as e:
+                    logger.error(f"Failed to load default server '{server_name}': {e}")
 
         if loaded_count > 0:
             logger.info(f"Successfully loaded {loaded_count} default MCP servers")
@@ -134,24 +155,24 @@ async def load_default_servers():
 
 
 async def add_server_async(
-    path=None, name=None, command=None, args=None, env=None
+    path=None, name=None, command=None, args=None, url=None, env=None
 ) -> Tuple[Dict[str, Any], int]:
     app = await initialize_chat_app()
     if not app:
         return {"status": "error", "message": "Chat app not initialized"}, 500
 
-    identifier = path if path else name
+    identifier = path if path else (url if url else name)
     if not identifier:
         return {
             "status": "error",
-            "message": "Missing server identifier (path or name)",
+            "message": "Missing server identifier (path, url, or name)",
         }, 400
 
     try:
         added_tools = await app.connect_to_mcp_server(
-            path=path, name=name, command=command, args=args, env=env
+            path=path, name=name, command=command, args=args, url=url, env=env
         )
-        server_display_name = Path(path).name if path else name
+        server_display_name = Path(path).name if path else (url if url else name)
         return {
             "status": "success",
             "message": f"Server '{server_display_name}' added.",
@@ -470,6 +491,7 @@ async def add_server(request: Request):
     name = data.get("name")
     command = data.get("command")
     args = data.get("args")  # Expecting a list
+    url = data.get("url")  # New URL parameter
     env = data.get("env", {})  # Expecting a dict
 
     if not loop or not loop.is_running():
@@ -481,6 +503,12 @@ async def add_server(request: Request):
             add_server_async(path=path, env=env), loop
         )
         identifier_log = path
+    elif url:
+        # Adding via URL
+        future = asyncio.run_coroutine_threadsafe(
+            add_server_async(url=url, name=name, env=env), loop
+        )
+        identifier_log = url
     elif name and command and isinstance(args, list):
         # Adding via command/args (e.g., from JSON)
         future = asyncio.run_coroutine_threadsafe(
@@ -490,7 +518,7 @@ async def add_server(request: Request):
     else:
         raise HTTPException(
             status_code=400,
-            detail="Invalid parameters. Provide either 'path' or 'name', 'command', and 'args'.",
+            detail="Invalid parameters. Provide either 'path', 'url', or 'name', 'command', and 'args'.",
         )
 
     try:
