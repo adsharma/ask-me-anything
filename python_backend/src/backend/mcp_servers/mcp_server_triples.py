@@ -2,10 +2,10 @@
 import os
 
 import duckdb
-from mcp.server.fastmcp import FastMCP
+from fastmcp.server.fastmcp import FastMCP
 
 # Create an MCP server
-mcp = FastMCP("Triples")
+fastmcp = FastMCP("Triples")
 
 KG_DIR = "../python_backend/src/backend/knowledge-graph"
 
@@ -27,7 +27,7 @@ class TripleStore:
 triple_store = TripleStore()
 
 
-@mcp.tool()
+@fastmcp.tool()
 def print_node_triples(label_to_find, limit: int = 10):
     """
     Prints knowledge graph triples for a given node label.
@@ -73,4 +73,4 @@ def print_node_triples(label_to_find, limit: int = 10):
 
 if __name__ == "__main__":
     # Initialize and run the server
-    mcp.run(transport="stdio")
+    fastmcp.run(transport="stdio")
