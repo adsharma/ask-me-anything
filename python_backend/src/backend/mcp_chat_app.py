@@ -11,11 +11,10 @@ from typing import Any, Dict, List, Optional, Tuple
 from ai_backend_manager import AIBackendManager
 from conversation_db import ConversationDB
 from dotenv import load_dotenv
+from fastmcp import Client
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -46,7 +45,7 @@ class MCPChatApp:
 
         # MCP-related properties
         self.mcp_tools: List[Any] = []
-        self.tool_to_session: Dict[str, ClientSession] = {}
+        self.tool_to_client: Dict[str, Any] = {}
         self.chat_history: List[genai_types.Content] = []
         self.server_resources: Dict[str, Dict[str, Any]] = {}
         self.cached_gemini_declarations: Optional[
@@ -265,7 +264,7 @@ class MCPChatApp:
             self.gemini_sync_client = None
             raise
 
-    async def _check_server_status(self, identifier: str, session: ClientSession):
+    async def _check_server_status(self, identifier: str, session):
         # Use identifier (path or name) for logging and access
         server_display_name = (
             os.path.basename(identifier)
@@ -322,58 +321,62 @@ class MCPChatApp:
         name: Optional[str] = None,
         command: Optional[str] = None,
         args: Optional[List[str]] = None,
+        url: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
     ) -> List[str]:
-        identifier = path if path else name
+        identifier = path if path else (url if url else name)
         if not identifier:
-            raise ValueError("Either 'path' or 'name' must be provided.")
+            raise ValueError("Either 'path', 'url', or 'name' must be provided.")
 
         if identifier in self.server_resources:
-            server_display_name = os.path.basename(path) if path else name
+            server_display_name = (
+                os.path.basename(path) if path else (url if url else name)
+            )
             logger.warning(
                 f"Server '{server_display_name}' ({identifier}) is already connected. Skipping."
             )
             raise ValueError(f"Server '{server_display_name}' is already connected.")
 
-        command_list: List[str] = []
-        if path:
-            if not os.path.exists(path):
-                logger.error(f"MCP server script not found: {path}")
-                raise FileNotFoundError(f"Server script not found: {path}")
-            # Assume python if path is given for now, could add more checks
-            command_to_use = sys.executable
-            command_list = [command_to_use, path]
-            logger.info(
-                f"Preparing to connect via path: {path} using '{command_to_use}'"
-            )
-        elif name and command and args is not None:
-            command_list = [command] + args
-            logger.info(
-                f"Preparing to connect via command: name='{name}', command='{command}', args={args}"
-            )
-        else:
-            raise ValueError(
-                "Invalid parameters. Provide either 'path' or ('name', 'command', 'args')."
-            )
-
-        server_params = StdioServerParameters(
-            command=command_list[0],
-            args=command_list[1:],
-            env=env,  # Pass the environment variables to the subprocess
-        )
-
         server_stack = AsyncExitStack()
         try:
             logger.info(f"Connecting to MCP server: {identifier}")
-            stdio_transport = await server_stack.enter_async_context(
-                stdio_client(server_params)
-            )
-            stdio, write = stdio_transport
-            session = await server_stack.enter_async_context(
-                ClientSession(stdio, write)
-            )
-            await session.initialize()
-            logger.info(f"Connected to MCP server: {identifier}")
+            if path:
+                if not os.path.exists(path):
+                    logger.error(f"MCP server script not found: {path}")
+                    raise FileNotFoundError(f"Server script not found: {path}")
+                config = {
+                    "mcpServers": {
+                        identifier: {
+                            "transport": "stdio",
+                            "command": sys.executable,
+                            "args": [path],
+                            "env": env,
+                        }
+                    }
+                }
+                session = await server_stack.enter_async_context(Client(config))
+                logger.info(f"Connected to MCP server via path: {path}")
+            elif url:
+                config = {"mcpServers": {identifier: {"transport": "http", "url": url}}}
+                session = await server_stack.enter_async_context(Client(config))
+                logger.info(f"Connected to MCP server via URL: {url}")
+            elif name and command and args is not None:
+                config = {
+                    "mcpServers": {
+                        identifier: {
+                            "transport": "stdio",
+                            "command": command,
+                            "args": args,
+                            "env": env,
+                        }
+                    }
+                }
+                session = await server_stack.enter_async_context(Client(config))
+                logger.info(f"Connected to MCP server via command: {command} {args}")
+            else:
+                raise ValueError(
+                    "Invalid parameters. Provide either 'path', 'url', or ('name', 'command', 'args')."
+                )
 
             # Add to resources immediately after successful connection
             self.server_resources[identifier] = {
@@ -381,24 +384,22 @@ class MCPChatApp:
                 "stack": server_stack,
                 "tools": [],  # Will be populated below
                 "status": "connected",
-                "command_list": command_list,  # Store how it was launched
             }
 
-            response = await session.list_tools()
-            server_tools = response.tools
+            server_tools = await session.list_tools()
             logger.info(
                 f"Server {identifier} provides tools: {[tool.name for tool in server_tools]}"
             )
 
             added_tools_names = []
             for tool in server_tools:
-                if tool.name in self.tool_to_session:
+                if tool.name in self.tool_to_client:
                     logger.warning(
                         f"Tool name conflict: '{tool.name}' already exists. Skipping tool from {identifier}."
                     )
                 else:
                     self.mcp_tools.append(tool)
-                    self.tool_to_session[tool.name] = session
+                    self.tool_to_client[tool.name] = session
                     added_tools_names.append(tool.name)
                     self.gemini_tools_dirty = True
 
@@ -445,7 +446,7 @@ class MCPChatApp:
             tool for tool in self.mcp_tools if tool.name not in tools_to_remove
         ]
         for tool_name in tools_to_remove:
-            self.tool_to_session.pop(tool_name, None)
+            self.tool_to_client.pop(tool_name, None)
 
         if tools_to_remove:
             self.gemini_tools_dirty = True
@@ -477,7 +478,7 @@ class MCPChatApp:
 
             # Clear all remaining state
             self.mcp_tools.clear()
-            self.tool_to_session.clear()
+            self.tool_to_client.clear()
             self.server_resources.clear()
             self.gemini_tools_dirty = True
 
@@ -602,7 +603,7 @@ class MCPChatApp:
         self, tool_name: str, args: Dict[str, Any]
     ) -> Tuple[str, Optional[str]]:
         """Executes an MCP tool and returns a tuple: (status_string, result_content_or_none)."""
-        if tool_name not in self.tool_to_session:
+        if tool_name not in self.tool_to_client:
             logger.error(
                 f"Attempted to call unknown or disconnected MCP tool: {tool_name}"
             )
@@ -611,7 +612,7 @@ class MCPChatApp:
             )
             return error_msg, None  # Return error status and None content
 
-        session = self.tool_to_session[tool_name]
+        session = self.tool_to_client[tool_name]
         server_identifier = None
         for identifier, resources in self.server_resources.items():
             if resources["session"] == session:
@@ -627,25 +628,30 @@ class MCPChatApp:
 
         try:
             logger.info(f"Executing MCP tool '{tool_name}' with args: {args}")
-            response = await session.call_tool(tool_name, args)
+            result = await session.call_tool(tool_name, args)
 
             # Extract content and check for errors
             result_content = ""
-            if response.content is not None:
-                if isinstance(response.content, list):
-                    # Handle list of content items (e.g., TextContent objects)
+            if hasattr(result, "data"):
+                content_data = result.data
+            else:
+                content_data = result
+
+            if content_data is not None:
+                if isinstance(content_data, list):
+                    # Handle list of content items
                     content_texts = []
-                    for item in response.content:
+                    for item in content_data:
                         if hasattr(item, "text"):
                             content_texts.append(str(item.text))
                         else:
                             content_texts.append(str(item))
                     result_content = "\n".join(content_texts)
                 else:
-                    result_content = str(response.content)
+                    result_content = str(content_data)
 
             # Check if the response indicates an error
-            is_error = getattr(response, "isError", False)
+            is_error = getattr(result, "is_error", False)
             if is_error or (
                 result_content
                 and any(
