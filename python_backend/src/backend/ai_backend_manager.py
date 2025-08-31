@@ -40,13 +40,12 @@ class AIBackendManager:
         # Backend-specific settings
         self.backend_settings = {
             "gemini": {
-                "default_model": "gemini-1.5-flash-latest",
+                "default_model": "gemini-2.5-flash-lite",
                 "requires_api_key": True,
                 "models": [
-                    "gemini-1.5-flash-latest",
-                    "gemini-1.5-pro-latest",
-                    "gemini-2.0-flash",
-                    "gemini-exp-1206",
+                    "gemini-2.5-flash-lite",
+                    "gemini-2.5-flash",
+                    "gemini-2.5-pro",
                 ],
             },
             "ollama": {
