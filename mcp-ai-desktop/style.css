@@ -567,6 +567,48 @@ body {
   border-top: 1px solid var(--border-color);
 }
 
+/* Thinking section styling */
+.thinking-details {
+  margin-bottom: 12px;
+  background-color: var(--system-message-bg);
+  border: 1px solid var(--system-message-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.thinking-details .message-summary {
+  background-color: rgba(140, 125, 107, 0.1);
+  font-style: italic;
+  font-size: 0.85em;
+  padding: 8px 12px;
+}
+
+.thinking-details .message-details-content {
+  padding: 10px 12px 12px 12px;
+  border-top: 1px solid var(--system-message-border);
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  background-color: rgba(140, 125, 107, 0.05);
+}
+
+body.dark .thinking-details {
+  background-color: rgba(180, 165, 150, 0.1);
+  border: 1px solid rgba(180, 165, 150, 0.2);
+}
+
+body.dark .thinking-details .message-summary {
+  background-color: rgba(180, 165, 150, 0.15);
+}
+
+body.dark .thinking-details .message-details-content {
+  background-color: rgba(180, 165, 150, 0.08);
+  border-top: 1px solid rgba(180, 165, 150, 0.2);
+}
+
+.response-content {
+  margin-top: 8px;
+}
+
 .input-area {
   display: flex;
   flex-direction: column;

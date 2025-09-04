@@ -156,6 +156,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     return {processedText, latexPlaceholders};
   }
 
+  function parseThinking(text) {
+    const thinkStart = text.indexOf('<think>');
+    const thinkEnd = text.indexOf('</think>');
+    if (thinkStart !== -1 && thinkEnd !== -1 && thinkEnd > thinkStart) {
+      const thinking = text.substring(thinkStart + 7, thinkEnd);
+      const response = text.substring(0, thinkStart) + text.substring(thinkEnd + 8);
+      return { thinking, response: response.trim() };
+    }
+    return { thinking: null, response: text };
+  }
+
   // Returns the created messageDiv element
   function addMessage(text, sender) {
       const messageDiv = document.createElement("div");
@@ -246,16 +257,54 @@ document.addEventListener("DOMContentLoaded", async () => {
           contentDiv.classList.add("message-content");
 
           if (sender === "ai") {
-              try {
-                  const {processedText, latexPlaceholders} = renderLaTeX(text);
-                  let html = marked.parse(processedText);
-                  latexPlaceholders.forEach(({placeholder, rendered}) => {
-                      html = html.replace(placeholder, rendered);
-                  });
-                  contentDiv.innerHTML = html;
-              } catch (parseError) {
-                  console.error("Error parsing AI message content:", parseError);
-                  contentDiv.textContent = text; // Fallback to raw text on error
+              // Parse thinking tags for reasoning models
+              const parsed = parseThinking(text);
+
+              if (parsed.thinking) {
+                  // Create collapsible thinking section
+                  const thinkingDetails = document.createElement("details");
+                  thinkingDetails.classList.add("message-details", "thinking-details");
+
+                  const thinkingSummary = document.createElement("summary");
+                  thinkingSummary.classList.add("message-summary");
+                  thinkingSummary.textContent = "Reasoning...";
+                  thinkingSummary.style.color = 'var(--text-secondary)';
+
+                  const thinkingContent = document.createElement("div");
+                  thinkingContent.classList.add("message-details-content");
+                  try {
+                      const {processedText, latexPlaceholders} = renderLaTeX(parsed.thinking);
+                      let html = marked.parse(processedText);
+                      latexPlaceholders.forEach(({placeholder, rendered}) => {
+                          html = html.replace(placeholder, rendered);
+                      });
+                      thinkingContent.innerHTML = html;
+                  } catch (parseError) {
+                      console.error("Error parsing thinking content:", parseError);
+                      thinkingContent.textContent = parsed.thinking;
+                  }
+
+                  thinkingDetails.appendChild(thinkingSummary);
+                  thinkingDetails.appendChild(thinkingContent);
+                  contentDiv.appendChild(thinkingDetails);
+              }
+
+              // Render the actual response content
+              if (parsed.response) {
+                  const responseDiv = document.createElement("div");
+                  responseDiv.classList.add("response-content");
+                  try {
+                      const {processedText, latexPlaceholders} = renderLaTeX(parsed.response);
+                      let html = marked.parse(processedText);
+                      latexPlaceholders.forEach(({placeholder, rendered}) => {
+                          html = html.replace(placeholder, rendered);
+                      });
+                      responseDiv.innerHTML = html;
+                  } catch (parseError) {
+                      console.error("Error parsing AI message content:", parseError);
+                      responseDiv.textContent = parsed.response; // Fallback to raw text on error
+                  }
+                  contentDiv.appendChild(responseDiv);
               }
           } else { // User message
               contentDiv.textContent = text;
@@ -348,17 +397,56 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else if (isAiMessage) {
           const contentDiv = document.createElement("div");
           contentDiv.classList.add("message-content");
-           try {
-              const {processedText, latexPlaceholders} = renderLaTeX(text);
-              let html = marked.parse(processedText);
-              latexPlaceholders.forEach(({placeholder, rendered}) => {
-                html = html.replace(placeholder, rendered);
-              });
-              contentDiv.innerHTML = html;
-            } catch (parseError) {
-               console.error("Error parsing AI message content:", parseError);
-               contentDiv.textContent = text; // Fallback to raw text on error
-            }
+
+          // Parse thinking tags for reasoning models
+          const parsed = parseThinking(text);
+
+          if (parsed.thinking) {
+              // Create collapsible thinking section
+              const thinkingDetails = document.createElement("details");
+              thinkingDetails.classList.add("message-details", "thinking-details");
+
+              const thinkingSummary = document.createElement("summary");
+              thinkingSummary.classList.add("message-summary");
+              thinkingSummary.textContent = "Reasoning...";
+              thinkingSummary.style.color = 'var(--text-secondary)';
+
+              const thinkingContent = document.createElement("div");
+              thinkingContent.classList.add("message-details-content");
+              try {
+                  const {processedText, latexPlaceholders} = renderLaTeX(parsed.thinking);
+                  let html = marked.parse(processedText);
+                  latexPlaceholders.forEach(({placeholder, rendered}) => {
+                      html = html.replace(placeholder, rendered);
+                  });
+                  thinkingContent.innerHTML = html;
+              } catch (parseError) {
+                  console.error("Error parsing thinking content:", parseError);
+                  thinkingContent.textContent = parsed.thinking;
+              }
+
+              thinkingDetails.appendChild(thinkingSummary);
+              thinkingDetails.appendChild(thinkingContent);
+              contentDiv.appendChild(thinkingDetails);
+          }
+
+          // Render the actual response content
+          if (parsed.response) {
+              const responseDiv = document.createElement("div");
+              responseDiv.classList.add("response-content");
+              try {
+                  const {processedText, latexPlaceholders} = renderLaTeX(parsed.response);
+                  let html = marked.parse(processedText);
+                  latexPlaceholders.forEach(({placeholder, rendered}) => {
+                      html = html.replace(placeholder, rendered);
+                  });
+                  responseDiv.innerHTML = html;
+              } catch (parseError) {
+                  console.error("Error parsing AI message content:", parseError);
+                  responseDiv.textContent = parsed.response; // Fallback to raw text on error
+              }
+              contentDiv.appendChild(responseDiv);
+          }
           messageDiv.appendChild(contentDiv);
       } else { // Should primarily be 'user' or 'ai-loading'
            messageDiv.textContent = text; // Default to text for user or loading placeholder
